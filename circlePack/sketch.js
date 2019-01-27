@@ -1,6 +1,8 @@
 
 
 let pack;
+let cam;
+let is3D;
 
 function keyPressed() {
   switch(keyCode) {
@@ -13,63 +15,52 @@ function keyPressed() {
   }
 }
 function setup() {
-  createCanvas(1200, 800);
+  is3D = false;
+
+  createCanvas(800, 800,WEBGL);
+  cam = createEasyCam();
   randomSeed(1);
   ellipseMode(CENTER);
   // frameRate(10)
-  pack = new Pack(2);
+  pack = new Pack(20);
 
-  fastRun()
+  fastRun(true)
 }
 
-function fastRun() {
-  noLoop();
+function fastRun(shouldDraw) {
+  if (!shouldDraw)
+    noLoop();
   background(255)
 
-
-  strokeWeight(.5);
-  fill(0, 50);
-
   let pos;
-  const numAttempts = 2000;
+  const numAttempts = 20;
   let attempts = numAttempts;
   do {
-    pos = p5.Vector.random2D().mult(randomGaussian(0, 100)).add(width/2, height/2)
+    pos = is3D ?
+      p5.Vector.random3D().mult(randomGaussian(0, 100)) :
+      p5.Vector.random2D().mult(randomGaussian(0, 100)).add(width/2, height/2)
+
     if (!pack.add(pos)) {
       attempts--;
     } else {
       attempts = numAttempts;
-      ellipse(pos.x, pos.y, pack.radius * 2)
     }
   } while (attempts)
 
-
+  pack.head.render(pack.radius);
 }
 
 function draw() {
-  // if (frameCount % 10) {
-  //   background(255)
-  //   let pos;
-  //   let attempts = 10;
-  //   do {
-  //     pos = createVector(random(0,width), random(0,height));
-  //     attempts--;
-  //   } while (attempts && !pack.add(pos))
+  background(255);
 
-  //   print(pack)
-  //   pack.head.render(pack.radius);
-  //   const searchRad = 100;
-  //   pack.head.getPointsWithinRadius(createVector(mouseX, mouseY), searchRad)
-  //     .forEach(node => {
-  //       fill('green');
-  //       print(pack)
-  //       ellipse(node.pos.x, node.pos.y, pack.radius * 2);
-  //     })
-  //   fill(0, 1);
-  //   ellipse(mouseX,mouseY, searchRad * 2)
-  // }
+  let locX = mouseX - height / 2;
+  let locY = mouseY - width / 2;
+
+  ambientLight(60, 60, 60);
+  pointLight(255, 255, 255, locX, locY, 100);
 
 
+  pack.head.render(pack.radius);
 }
 
 
@@ -137,12 +128,21 @@ class PackNode {
   }
 
   render(rad) {
-    fill(0,20);
-    ellipse(this.pos.x, this.pos.y, rad * 2);
-    // fill(0);
-    // text(this.nodeId, this.pos.x, this.pos.y);
+
+    if (is3D) {
+      // fill('blue')
+      ambientMaterial(127,30,200);
+      noStroke()
+      push();
+      translate(this.pos.x, this.pos.y, this.pos.z);
+      sphere(rad);
+      pop();
+    } else {
+      fill(0,30)
+      ellipse(this.pos.x, this.pos.y, rad * 2)
+    }
+
     this.children.forEach((child) => {
-      // line(this.pos.x, this.pos.y, child.pos.x, child.pos.y)
       child.render(rad)
     });
   }
@@ -171,3 +171,9 @@ class Pack {
     return false;
   }
 }
+
+Dw.EasyCam.prototype.apply = function(n) {
+  var o = this.cam;
+  n = n || o.renderer,
+  n && (this.camEYE = this.getPosition(this.camEYE), this.camLAT = this.getCenter(this.camLAT), this.camRUP = this.getUpVector(this.camRUP), n._curCamera.camera(this.camEYE[0], this.camEYE[1], this.camEYE[2], this.camLAT[0], this.camLAT[1], this.camLAT[2], this.camRUP[0], this.camRUP[1], this.camRUP[2]))
+};
