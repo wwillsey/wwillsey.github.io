@@ -13,35 +13,63 @@ function keyPressed() {
   }
 }
 function setup() {
-  createCanvas(400, 400);
+  createCanvas(1200, 800);
   randomSeed(1);
   ellipseMode(CENTER);
   // frameRate(10)
-  pack = new Pack(5);
+  pack = new Pack(2);
+
+  fastRun()
+}
+
+function fastRun() {
+  noLoop();
+  background(255)
+
+
+  strokeWeight(.5);
+  fill(0, 50);
+
+  let pos;
+  const numAttempts = 2000;
+  let attempts = numAttempts;
+  do {
+    pos = p5.Vector.random2D().mult(randomGaussian(0, 100)).add(width/2, height/2)
+    if (!pack.add(pos)) {
+      attempts--;
+    } else {
+      attempts = numAttempts;
+      ellipse(pos.x, pos.y, pack.radius * 2)
+    }
+  } while (attempts)
+
+
 }
 
 function draw() {
-  if (frameCount % 100) {
-    background(255)
-    let pos;
-    let attempts = 10;
-    do {
-      pos = createVector(random(0,width), random(0,height));
-      attempts--;
-    } while (attempts && !pack.add(pos))
+  // if (frameCount % 10) {
+  //   background(255)
+  //   let pos;
+  //   let attempts = 10;
+  //   do {
+  //     pos = createVector(random(0,width), random(0,height));
+  //     attempts--;
+  //   } while (attempts && !pack.add(pos))
 
-    print(pack)
-    pack.head.render(pack.radius);
-    const searchRad = pack.radius * 10;
-    pack.head.getPointsWithinRadius(createVector(mouseX, mouseY), searchRad)
-      .forEach(node => {
-        fill('green');
-        print(pack)
-        ellipse(node.pos.x, node.pos.y, pack.radius * 2);
-      })
-    fill(0, 1);
-    ellipse(mouseX,mouseY, searchRad * 2)
-  }
+  //   print(pack)
+  //   pack.head.render(pack.radius);
+  //   const searchRad = 100;
+  //   pack.head.getPointsWithinRadius(createVector(mouseX, mouseY), searchRad)
+  //     .forEach(node => {
+  //       fill('green');
+  //       print(pack)
+  //       ellipse(node.pos.x, node.pos.y, pack.radius * 2);
+  //     })
+  //   fill(0, 1);
+  //   ellipse(mouseX,mouseY, searchRad * 2)
+  // }
+
+
 }
 
 
@@ -92,11 +120,11 @@ class PackNode {
 
   getPointsWithinRadius(pos, rad) {
     let res = [];
-    print('considering', this, 'for ', pos);
+    // print('considering', this, 'for ', pos);
     if (this.pos.dist(pos) <= rad)
       res.push(this);
     this.children.forEach((child) => {
-      print('child to try recursion', child);
+      // print('child to try recursion', child);
       if (child.range.x[0] - rad <= pos.x &&
           child.range.y[0] - rad <= pos.y &&
           child.range.z[0] - rad <= pos.z &&
@@ -134,8 +162,8 @@ class Pack {
     const rad = 2 * this.radius;
     const pointsWithinRadius = this.head.getPointsWithinRadius(pos, rad)
 
-    print('attempting to add pos,', pos);
-    print('pointsWithinRadius', pointsWithinRadius);
+    // print('attempting to add pos,', pos);
+    // print('pointsWithinRadius', pointsWithinRadius);
     if (pointsWithinRadius.length === 0) {
       this.head.add(new PackNode(pos));
       return true;
