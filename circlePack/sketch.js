@@ -6,6 +6,13 @@ let is3D;
 let circleColors;
 let E;
 let BUFFER;
+
+let img;
+
+function preload() {
+  img = loadImage('http://localhost:3000/curve/starry.jpg');
+}
+
 function keyPressed() {
   switch(keyCode) {
     case ENTER:
@@ -18,9 +25,9 @@ function keyPressed() {
 }
 function setup() {
   is3D = false;
-  BUFFER = 2;
+  BUFFER = 0;
 
-  createCanvas(2000, 1200, is3D ? WEBGL : undefined);
+  createCanvas(1920, 1080, is3D ? WEBGL : undefined);
   cam = createEasyCam();
   E = new p5.Ease();
   randomSeed(1);
@@ -37,19 +44,20 @@ function setup() {
     color(255)
   ];
 
-  pack.fillWithSizes(
-    [
-      [300],
-      [150],
-      [100],
-      [75],
-      // [50],
-      [20, 100],
-      [10, 1000],
-      [5, 500],
-      [2, 100]
-    ]
-  )
+  // pack.fillWithSizes(
+  //   [
+  //     // [300, 1],
+  //     [150, 1],
+  //     // [100, 1],
+  //     [75, 100],
+  //     [50, 2000],
+  //     [20, 1000],
+  //     [10, 1000],
+  //     [5, 5000],
+  //     [2, 1000]
+  //   ]
+  // )
+  // fastRun(false);
 }
 
 function fastRun(shouldDraw) {
@@ -76,7 +84,7 @@ function fastRun(shouldDraw) {
 }
 
 function draw() {
-  background(255);
+  // background(0,0,0,5);
 
   if (is3D) {
     let locX = mouseX - height / 2;
@@ -86,8 +94,31 @@ function draw() {
     pointLight(255, 255, 255, locX, locY, 100);
   }
 
+  pack.head = null;
+  pack.fillWithSizes([
+    // [300, 1],
+    // [150, 1],
+    [100, 20],
+    // [75, 100],
+    [50, 500],
+    // [20, 500],
+    [10, 500],
+    // [3, 1000],
+    // [2, 500]
+  ]);
   if (pack.head)
   pack.head.render(pack.radius);
+  fill(255);
+  text(frameRate(), 10, 10)
+  // noLoop();
+}
+
+function getImageColor(x, y) {
+  x = map(x, 0, 1, 0, img.width);
+  y = map(y, 0, 1, 0, img.height);
+
+  const c = img.get(x,y);
+  return color(red(c), green(c), blue(c), 150)
 }
 
 
@@ -98,7 +129,7 @@ class PackNode {
     this.children = []
     this.pos = pos;
     this.radius = radius;
-    this.color = lerpColors(circleColors, random(0,1));
+    this.color = getImageColor(this.pos.x / width, this.pos.y / height);
     this.range = {
       x: [this.pos.x - radius, this.pos.x + radius],
       y: [this.pos.y - radius, this.pos.y + radius],
@@ -144,15 +175,47 @@ class PackNode {
       res.push(this);
     this.children.forEach((child) => {
       // print('child to try recursion', child);
-      if (child.range.x[0] <= pos.x + rad &&
-          child.range.y[0] <= pos.y + rad &&
-          child.range.z[0] <= pos.z + rad &&
-          child.range.x[1] >= pos.x - rad &&
-          child.range.y[1] >= pos.y - rad &&
-          child.range.z[1] >= pos.z - rad)
+      if (child.range.x[0] < pos.x + rad &&
+          child.range.y[0] < pos.y + rad &&
+          child.range.z[0] < pos.z + rad &&
+          child.range.x[1] > pos.x - rad &&
+          child.range.y[1] > pos.y - rad &&
+          child.range.z[1] > pos.z - rad)
         child.getCollidingWith(pos, rad).forEach((node) => res.push(node));
       });
     return res;
+  }
+
+  collidesWithAnother(pos, rad) {
+    // print('considering', this, 'for ', pos, rad);
+    if (this.pos.dist(pos) < rad + this.radius)
+      return true;
+
+    for(let i = 0; i < this.children.length; i++) {
+      const child = this.children[i];
+      if (child &&
+        child.range.x[0] < pos.x + rad &&
+        child.range.y[0] < pos.y + rad &&
+        child.range.z[0] < pos.z + rad &&
+        child.range.x[1] > pos.x - rad &&
+        child.range.y[1] > pos.y - rad &&
+        child.range.z[1] > pos.z - rad &&
+        child.collidesWithAnother(pos, rad))
+          return true;
+    }
+    return false;
+  }
+
+  collidesWithAnotherSimple(pos, rad) {
+    if (this.pos.dist(pos) < rad + this.radius)
+      return true;
+    for(let i = 0; i < this.children.length; i++) {
+      const child = this.children[i];
+      if (child && child.collidesWithAnotherSimple(pos, rad)) {
+        return true
+      }
+    }
+    return false;
   }
 
   render() {
@@ -173,10 +236,11 @@ class PackNode {
     }
     // fill(0)
     // text(this.nodeId, this.pos.x, this.pos.y)
-    // fill(0,10);
+    // fill(0,20);
     // rect(this.range.x[0], this.range.y[0], this.range.x[1], this.range.y[1])
     this.children.forEach((child) => {
       child.render(this.radius)
+      stroke(1)
       // line(this.pos.x, this.pos.y, child.pos.x, child.pos.y)
 
     });
@@ -194,9 +258,8 @@ class Pack {
     }
 
     // print('attempting to add pos,', pos, nodeId);
-    const pointsWithinRadius = this.head.getCollidingWith(pos, radius + BUFFER);
     // print('pointsWithinRadius', pointsWithinRadius);
-    if (pointsWithinRadius.length === 0) {
+    if (!this.head.collidesWithAnother(pos, radius + BUFFER)) {
       this.head.add(new PackNode(pos, radius));
       return true;
     }
@@ -223,7 +286,7 @@ class Pack {
   fillWithSizes(balls) {
     balls.forEach(([radius, attempts]) => {
       print(radius, attempts);
-      while(this.addRandom(radius, attempts || 100));
+      while(this.addRandom(abs(randomGaussian(radius, radius / 2)), attempts || 100));
     })
   }
 }
