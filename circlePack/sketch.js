@@ -36,28 +36,6 @@ function setup() {
   // frameRate(10)
   pack = new Pack();
 
-  circleColors = [
-    color(29, 52, 198),
-    color(61, 153, 41),
-    color(170, 142, 82),
-    color(70, 73, 91),
-    color(255)
-  ];
-
-  // pack.fillWithSizes(
-  //   [
-  //     // [300, 1],
-  //     [150, 1],
-  //     // [100, 1],
-  //     [75, 100],
-  //     [50, 2000],
-  //     [20, 1000],
-  //     [10, 1000],
-  //     [5, 5000],
-  //     [2, 1000]
-  //   ]
-  // )
-  // fastRun(false);
 }
 
 function fastRun(shouldDraw) {
@@ -92,24 +70,26 @@ function draw() {
 
     ambientLight(60, 60, 60);
     pointLight(255, 255, 255, locX, locY, 100);
+    noloop();
   }
 
   pack.head = null;
   pack.fillWithSizes([
     // [300, 1],
     // [150, 1],
-    [100, 20],
+    // [100, 20],
     // [75, 100],
-    [50, 500],
+    // [50, 500],
     // [20, 500],
     [10, 500],
-    // [3, 1000],
+    [3, 5000],
     // [2, 500]
   ]);
   if (pack.head)
   pack.head.render(pack.radius);
   fill(255);
   text(frameRate(), 10, 10)
+  noLoop()
   // noLoop();
 }
 
