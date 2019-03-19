@@ -3,15 +3,41 @@ let canvas;
 let backgroundImg;
 let backgroundGradient = {}
 
-const isHSB = true;
+const isHSB = false;
+const backgroundEnabled = true;
+const useBackgroundSourceImage = true;
 const maxColorVal = isHSB ? 100 : 255;
+const backgroundSplitMean = .97;
+const backgroundSplitVariance = .01;
+const nborWeight = .3;
+const shuffleIn = true
+;
+
+const backgroundNegative = true;
+let wipeScreen = true;
+
+const scale = 1.5
+const useDisplayDimensions = true;
+
 let stdDevs;
+const stdDevFn = () => randomGaussian(2.5, 0.02)
 let data;
 
 
+let numRuns = 0;
+let seed;
+
 function preload() {
-  backgroundImg = loadImage('http://localhost:3000/curve/starry.jpg');
+  // backgroundImg = loadImage('http://localhost:3000/curve/starry.jpg');
+  backgroundImg = loadImage('http://localhost:3000/colorWalk/monet2.jpg');
+
 }
+
+
+// function mousePressed() {
+//   if(focused)
+//     start(mouseX, mouseY);
+// }
 
 function keyPressed() {
   switch (keyCode) {
@@ -20,34 +46,53 @@ function keyPressed() {
       break
     case BACKSPACE:
       start();
+      break;
+    case TAB:
+      randomSeed(Date.now())
+      seed = random(0, 10000);
+      backgroundImg = createImage(width,height);
+      backgroundImg.loadPixels();
+      numRuns = 0;
+      start();
   }
 }
 
-function start() {
+function start(xPos, yPos) {
+  numRuns++;
+
   data = Array.from({length: height}, () => Array.from({length: width}, () => null));
 
-  img = createImage(width,height);
-  img.loadPixels();
+  // if (wipeScreen || numRuns === 1) {
+    img = createImage(width,height);
+    img.loadPixels();
+  // }
   // colorMode(HSB, 100)
 
-  let seed = round(random(0, 100000));
-  seed = 94412;
+  // if (backgroundNegative && numRuns === 1)
+    // negateImage(backgroundImg)
+
+  // seed = 94412;
   print('seed', seed);
   randomSeed(seed);
 
-  stdDevs = Array.from({length: 3}, () => randomGaussian(1, 1));
+  stdDevs = Array.from({length: 3}, stdDevFn);
   print('stddevs', stdDevs);
 
-  createColorWalk(img, createFrontier(img), false);
+  setTimeout(() => createColorWalk(img, createFrontier(img, xPos, yPos), false), 200);
 }
 
 function setup() {
-  canvas = createCanvas(2880 / 2, 1800 / 2);
+  canvas = useDisplayDimensions ?
+    createCanvas(displayWidth, displayHeight) :
+    createCanvas(2880 * scale, 1800 * scale);
+
+  backgroundImg.resize(width, height)
+  seed = round(random(0, 100000));
   start();
 }
 
 function draw() {
-  background(20)
+  background(0)
   img.updatePixels();
   image(img, 0, 0);
 }
@@ -55,7 +100,7 @@ function draw() {
 function getRandomPixelIndex(frontier) {
   // const index = 0;
 
-  let index = random(frontier.length * .999, frontier.length * .99995)
+  let index = random(frontier.length * .997, frontier.length * .99995)
 
   // const index = random(0, frontier.length - 1);
   // const index = randomGaussian(frontier.length * .95, frontier.length * .1)
@@ -86,9 +131,10 @@ function colorWithCircle(x, y, col) {
 function applyColor(x, y, col) {
   if (isHSB) {
     img.set(x,y, color(HSVtoRGB(...col)));
-
+    backgroundImg.set(x,y, color(HSVtoRGB(...col)));
   } else {
     img.set(x,y, color(col))
+    backgroundImg.set(x,y, color(col))
   }
   // colorWithCircle(x,y,col);
 
@@ -98,10 +144,10 @@ function applyColor(x, y, col) {
 }
 
 
-function createFrontier(img) {
+function createFrontier(img, xPos, yPos) {
   const frontier = [{
-    x: img.width / 2,
-    y: img.height / 2,
+    x: xPos || img.width / 2,
+    y: yPos || img.height / 2,
     col: [random(0, maxColorVal),random(0,maxColorVal),random(0,maxColorVal)]
   }];
 
@@ -160,16 +206,36 @@ function modifyColor(c, p) {
 
   const coloredNbors = getNbors(p, img).map(px => getPixelColor(px, img)).filter(col => col != null);
   coloredNbors.forEach(col => {
-    center[0] += .1 * ((col[0]) - (c[0]));
-    center[1] += .1 * ((col[1])  - (c[1]));
-    center[2] += .1 * ((col[2]) - (c[2]));
+    center[0] += nborWeight * ((col[0]) - (c[0]));
+    center[1] += nborWeight * ((col[1])  - (c[1]));
+    center[2] += nborWeight * ((col[2]) - (c[2]));
   })
 
-  // const backgroundCol = backgroundImg.get(p.x,p.y);
-  // const split = randomGaussian(.98, .01);
+  // const coloredBackgroundNbors = getNbors(p, backgroundImg).map(px => getPixelColor(px, backgroundImg)).filter(col => col != null);
+  // coloredBackgroundNbors.forEach(col => {
+  //   center[0] += nborWeight * ((col[0]) - (c[0]));
+  //   center[1] += nborWeight * ((col[1])  - (c[1]));
+  //   center[2] += nborWeight * ((col[2]) - (c[2]));
+  // })
+
+
+ /// -1        0         1
+
+
+  let backgroundCol;
+  let split;
+
+  const useBackgroundData = backgroundEnabled && (useBackgroundSourceImage || ! (numRuns === 1));
+
+  if (useBackgroundData) {
+    backgroundCol = backgroundImg.get(p.x,p.y);
+    split = randomGaussian(backgroundSplitMean, backgroundSplitVariance);
+  }
+
   const gaussianFn = (fn, cent, stdDev) => {
-    // print(fn(c))
-    return (fn(c) + randomGaussian(cent, stdDev))// * split + (fn(backgroundCol)) * (1-split);
+    return useBackgroundData ?
+      (fn(c) + randomGaussian(cent, stdDev)) * split + (fn(backgroundCol)) * (1 - split) :
+      (fn(c) + randomGaussian(cent, stdDev));
   }
 
 
@@ -198,7 +264,12 @@ function processPixel(p, img) {
   unProcessedNbors.forEach(px => {
     applyColor(px.x, px.y, modifyColor(c, px));
   });
-  return shuffle(unProcessedNbors);
+
+
+  if (shuffleIn)
+    return shuffle(unProcessedNbors);
+
+  return unProcessedNbors;
 }
 
 function processNextPixel(frontier, img) {
@@ -365,4 +436,15 @@ function HSVtoRGB(h, s, v) {
       case 5: r = v, g = p, b = q; break;
   }
   return [r * 255, g * 255, b * 255]
+}
+
+
+function negateImage(i) {
+  for(let y =0 ; y < img.height; y++) {
+    for(let x = 0; x < img.width; x++) {
+      const c = img.get(x,y);
+      img.set(x,y, color(255 - red(c), 255 - green(c), 255 - blue(c)));
+    }
+  }
+  img.updatePixels();
 }
