@@ -7,20 +7,25 @@ const isHSB = false;
 const backgroundEnabled = true;
 const useBackgroundSourceImage = true;
 const maxColorVal = isHSB ? 100 : 255;
-const backgroundSplitMean = .97;
-const backgroundSplitVariance = .01;
-const nborWeight = .3;
-const shuffleIn = true
-;
+const backgroundSplitMean = .993;
+const backgroundSplitVariance = .1;
+const nborWeight = .1;
+const shuffleIn = true;
+
+const useDepth = false;
+const depthScale = 1000;
+const maxDepth = 0;
 
 const backgroundNegative = true;
 let wipeScreen = true;
 
 const scale = 1.5
 const useDisplayDimensions = true;
+const isGreyscale = false;
+
 
 let stdDevs;
-const stdDevFn = () => randomGaussian(2.5, 0.02)
+const stdDevFn = () => randomGaussian(5, 0.01)
 let data;
 
 
@@ -29,7 +34,7 @@ let seed;
 
 function preload() {
   // backgroundImg = loadImage('http://localhost:3000/curve/starry.jpg');
-  backgroundImg = loadImage('http://localhost:3000/colorWalk/monet2.jpg');
+  backgroundImg = loadImage('http://localhost:3000/colorWalk/cloudy.jpeg');
 
 }
 
@@ -45,6 +50,9 @@ function keyPressed() {
       saveCanvas(canvas, 'colors', 'jpg');
       break
     case BACKSPACE:
+      randomSeed(Date.now())
+      seed = random(0, 10000);
+    case SHIFT:
       start();
       break;
     case TAB:
@@ -94,13 +102,15 @@ function setup() {
 function draw() {
   background(0)
   img.updatePixels();
+  if (isGreyscale)
+    img.filter(GRAY);
   image(img, 0, 0);
 }
 
 function getRandomPixelIndex(frontier) {
   // const index = 0;
 
-  let index = random(frontier.length * .997, frontier.length * .99995)
+  let index = random(frontier.length * .998, frontier.length * .99995)
 
   // const index = random(0, frontier.length - 1);
   // const index = randomGaussian(frontier.length * .95, frontier.length * .1)
@@ -128,7 +138,10 @@ function colorWithCircle(x, y, col) {
   ellipse(x,y, abs(randomGaussian(5, 2)))
 };
 
-function applyColor(x, y, col) {
+function applyColor(x, y, d) {
+  const col = d.col;
+  const depth = d.depth || 0;
+
   if (isHSB) {
     img.set(x,y, color(HSVtoRGB(...col)));
     backgroundImg.set(x,y, color(HSVtoRGB(...col)));
@@ -138,7 +151,7 @@ function applyColor(x, y, col) {
   }
   // colorWithCircle(x,y,col);
 
-  data[y][x] = col;
+  data[y][x] = {col, depth};
   // stroke(col);
   // point(x,y);
 }
@@ -148,7 +161,7 @@ function createFrontier(img, xPos, yPos) {
   const frontier = [{
     x: xPos || img.width / 2,
     y: yPos || img.height / 2,
-    col: [random(0, maxColorVal),random(0,maxColorVal),random(0,maxColorVal)]
+    col: [random(0, maxColorVal),random(0, maxColorVal),random(0, maxColorVal)]
   }];
 
   // const col1 = color(random(0,255),random(0,255),random(0,255));
@@ -163,7 +176,7 @@ function createFrontier(img, xPos, yPos) {
   //     })
   //   }
   // }
-  frontier.forEach(p => applyColor(p.x, p.y, p.col));
+  frontier.forEach(p => applyColor(p.x, p.y, { col: p.col }));
   print('startcol: ', frontier[0].col);
   return frontier;
 }
@@ -195,8 +208,10 @@ function getPixelColor(p, img) {
 
 
 let step = 0;
-function modifyColor(c, p) {
+function modifyColor(d, p) {
   const center = [0,0,0];
+  const c = d.col;
+  const depth = d.depth;
   // if (random(0,1) > .99) {
   //   return color(20)
   // }
@@ -206,9 +221,9 @@ function modifyColor(c, p) {
 
   const coloredNbors = getNbors(p, img).map(px => getPixelColor(px, img)).filter(col => col != null);
   coloredNbors.forEach(col => {
-    center[0] += nborWeight * ((col[0]) - (c[0]));
-    center[1] += nborWeight * ((col[1])  - (c[1]));
-    center[2] += nborWeight * ((col[2]) - (c[2]));
+    center[0] += nborWeight * ((col.col[0]) - (c[0]));
+    center[1] += nborWeight * ((col.col[1])  - (c[1]));
+    center[2] += nborWeight * ((col.col[2]) - (c[2]));
   })
 
   // const coloredBackgroundNbors = getNbors(p, backgroundImg).map(px => getPixelColor(px, backgroundImg)).filter(col => col != null);
@@ -243,28 +258,27 @@ function modifyColor(c, p) {
   let r = constrain(gaussianFn(x => (x[0]), center[0], stdDevs[0]), 0, maxColorVal);
   let g = constrain(gaussianFn(x => (x[1]), center[1], stdDevs[1]), 0, maxColorVal)
   let b = constrain(gaussianFn(x => (x[2]), center[2], stdDevs[2]), 0, maxColorVal);
-  // print(r,g,b)
-  // const x = color(r,g,b);
-  // print('c', color(c))
-  // print('x', x)
-  // step++;
-  // if (step > 10)
-    // remove()
-  // const n = 255 / 20;
-  // r = r  - r % n + n/2
-  // g = g - g % n + n/2
-  // b = b - b % n + n/2
-  // print(r,g,b);
-  return [r,g,b]
+
+  if (useDepth) {
+    const distanceFactor = (.45 * height - dist(p.x, p.y, width/2, height/2)) / (.45 * height);
+    r += depth / depthScale * distanceFactor;
+    g += depth / depthScale * distanceFactor;
+    b += depth / depthScale * distanceFactor;
+  }
+
+
+  return {col: [r,g,b], depth: depth + 1};
 }
 
 function processPixel(p, img) {
   const c = getPixelColor(p,img);
-  const unProcessedNbors = getNbors(p, img).filter(px => !getPixelColor(px, img));
+  let unProcessedNbors = getNbors(p, img).filter(px => !getPixelColor(px, img));
   unProcessedNbors.forEach(px => {
     applyColor(px.x, px.y, modifyColor(c, px));
   });
 
+  if(maxDepth)
+    unProcessedNbors = unProcessedNbors.filter(px => getPixelColor(px).depth < maxDepth);
 
   if (shuffleIn)
     return shuffle(unProcessedNbors);
