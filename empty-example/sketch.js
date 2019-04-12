@@ -1,3 +1,4 @@
+/* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 
 
 function setup() {
@@ -5,5 +6,5 @@ function setup() {
 }
 
 function draw() {
-  
+
 }
