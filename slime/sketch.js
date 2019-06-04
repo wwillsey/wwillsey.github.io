@@ -3,14 +3,49 @@ let W;
 let slimes;
 let canvas;
 let drawCanvas;
-const maxSlimes = 25000;
+const startSlimes = 10000;
+const maxSlimes = 15000;
 const friction = .01;
 
-const boxLengthMult = .03;
-const boxSizeMult = .03;
+const boxLengthMult = .02;
+const boxSizeMult = .02;
+
+const decayFrequency = 17;
+const decayAmount = 60;
+
+const blurFrequency = 17;
+
+const renderFrames = false;
+const saveFrequency = 17;
+let saveFrameNum = 1;
+
+// const renderFrequency = 5;
+
+let colors;
+
+
+function keyPressed() {
+  switch(keyCode) {
+    case ENTER:
+      remove();
+      break;
+    case SHIFT:
+      background(0);
+  }
+}
 
 function setup() {
   canvas = createCanvas(1920 / 4, 1080 / 4);
+  randomSeed(1);
+  // slowColor = color(202, 122, 181);
+  // fastColor = color(122, 202, 143);
+
+  // slowColor = color(15, 89, 248);
+  // fastColor = color(156, 186, 252);
+
+  colors = reverse([color(222, 12, 73), color(222, 222, 73), color(222, 222, 210), color(130, 222, 210)]);
+
+
   pixelDensity(1);
   drawCanvas = createGraphics(width, height);
   pixelDensity(2);
@@ -19,7 +54,7 @@ function setup() {
     h: height,
   });
 
-  slimes = Array.from({length: 10000}, () => createSlime());
+  slimes = Array.from({length: startSlimes}, () => createSlime());
   // drawCanvas.rectMode(CENTER);
   drawCanvas.background(0,0);
   drawCanvas.noStroke();
@@ -52,12 +87,14 @@ function createSlime(x,y) {
     sensorLength: width * boxLengthMult,
     sensorBoxSize: width * boxSizeMult,
     speed: 0.01,
-    maxVel: 0.1,
-    depositAmount: 1,
+    maxVel: 0.2,
+    depositAmount: 10,
   });
 }
 
 function draw() {
+
+  slimes.push(createSlime());
   if (slimes.length > maxSlimes)
     slimes.splice(0,1)
 
@@ -70,19 +107,24 @@ function draw() {
 
   // if (frameCount % 20 === 0)
   //   W5.render();
-  // if (frameCount  % 2  === 1)
+  // if (frameCount % renderFrequency === 1)
     W.render();
+
+  if (renderFrames && frameCount % saveFrequency === 1) {
+    saveCanvas(`slime_${saveFrameNum}`);
+    saveFrameNum++;
+  }
   // }
   if(frameCount % 17 === 1) {
     W.sumMap = W.createSumMap();
   }
 
-  if (frameCount % 31 === 1) {
-    // W.render();
-    // saveCanvas('slime_1');
+  if (frameCount % decayFrequency === 1)
+    W.decay(decayAmount);
+
+  if (frameCount % blurFrequency === 1)
     W.Blur(1);
-    W.decay(40);
-  }
+
 
   slimes.forEach(slime => slime.update());
 }
@@ -97,8 +139,8 @@ class Slime {
 
   sense() {
     const sensorAttempts = this.options.sensorAttempts;
-    const sensorAngle = randomGaussian(this.options.sensorAngle, this.options.sensorAngle * .2);
-    const sensorLength = randomGaussian(this.options.sensorLength, this.options.sensorLength * .3);
+    const sensorAngle = randomGaussian(this.options.sensorAngle, this.options.sensorAngle * .05);
+    const sensorLength = randomGaussian(this.options.sensorLength, this.options.sensorLength * .5);
     const sensorBoxSize = this.options.sensorBoxSize / 2;
     const worldW = this.world.options.w;
     const worldH = this.world.options.h;
@@ -159,8 +201,9 @@ class Slime {
     drawCanvas.strokeWeight(1);
 
     const vel = pow(this.state.vx, 2) + pow(this.state.vy, 2);
-    const amt = pow(vel / pow(this.options.maxVel, 2), 2);
-    const col = lerpColor(color(202, 122, 181), color(122, 202, 143), amt);
+    const amt = pow(vel / pow(this.options.maxVel, 2), 3);
+
+    const col = lerpColors(colors, amt - randomGaussian(0, .1));
 
     drawCanvas.stroke(color(red(col), green(col), blue(col), this.options.depositAmount));
     drawCanvas.point(this.state.x, this.state.y);
@@ -173,7 +216,7 @@ class Slime {
     const { angle, count } = this.sense();
     this.state.angle = randomGaussian(angle, 0.01);
     // print(count);
-    const accel = p5.Vector.fromAngle(this.state.angle).mult(pow(max(count, 1),.5) * this.options.speed / this.state.m).add(frictionVec);
+    const accel = p5.Vector.fromAngle(this.state.angle).mult(log(max(count, 1)) * this.options.speed / this.state.m).add(frictionVec);
 
     this.state.vx += accel.x;
     this.state.vy += accel.y;
