@@ -1,17 +1,17 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 
 
-const stepSize = .2;
-const K0 = 0.001  * Math.sqrt(stepSize);
+const stepSize = 1;
+const K0 = 0.0006  * Math.sqrt(stepSize);
 let updateSteps = 1;
-const curvePts = 10;
-const noiseScale = 0.000001;
-const noiseAmp = 2;
-noiseNu = 0;
+const curvePts = 1;
+const noiseScale = 0.00001;
+const noiseAmp = .1;
+noiseNu = 0.1;
 
-const nu = .0001;
-const nInit = 5;
-const nMax = 10;
+const nu = .0000001;
+const nInit = 10;
+const nMax = 20;
 
 const maxSteps = 50000;
 
@@ -30,7 +30,7 @@ function setup() {
 
 function start() {
   curves = Array.from({length: nInit},
-    () => new CurveWalk({ x: width / 2, y: height / 2 }, stepSize, K0, 2, 50, .0001));
+    () => new CurveWalk({ x: width / 2, y: height / 2, theta: TWO_PI * random() }, stepSize, K0, 2, 50, .0001));
   background(241, 219, 168);
 
   desirePoint = {
@@ -65,33 +65,36 @@ function draw() {
       return;
     }
     // print(curve.state.theta)
-    noFill();
-    strokeWeight(.1);
+    // noFill();
+    // strokeWeight(.1);
     // point(curve.state.x, curve.state.y);
-    beginShape();
-    curveVertex(curve.state.x, curve.state.y);
+    // beginShape();
+    // curveVertex(curve.state.x, curve.state.y);
     for (let i = 0; i < curvePts; i++) {
-      curveVertex(curve.state.x, curve.state.y);
+      // curveVertex(curve.state.x, curve.state.y);
       curve.update();
-
-      push();
-        for(let j = 0; j < updateSteps ; j++) {
-          stroke(130, 115, 79, 10);
-          // noStroke();
-          const rand = randomGaussian(PI / 2, .1);
-          const theta = curve.state.theta;
-          const d = constrain(randomGaussian(10, 10), -5, 30);
-          const x1 = curve.state.x + cos(theta - rand) * d;
-          const y1 = curve.state.y + sin(theta - rand) * d;
-          // strokeWeight(.1);
-          circle(x1,y1, 4);
-          // circle(x2,y2, 4);
-        }
-      pop();
+      fill(random()*255);
+      const x = curve.state.x;
+      const y = curve.state.y;
+      square(x - x % randomGaussian(5, .005), y - y % randomGaussian(5, .005), 5)
+      // push();
+      //   for(let j = 0; j < updateSteps ; j++) {
+      //     stroke(130, 115, 79, 10);
+      //     // noStroke();
+      //     const rand = randomGaussian(PI / 2, .1);
+      //     const theta = curve.state.theta;
+      //     const d = constrain(randomGaussian(10, 10), -5, 30);
+      //     const x1 = curve.state.x + cos(theta - rand) * d;
+      //     const y1 = curve.state.y + sin(theta - rand) * d;
+      //     // strokeWeight(.1);
+      //     circle(x1,y1, 4);
+      //     // circle(x2,y2, 4);
+      //   }
+      // pop();
     }
-    curveVertex(curve.state.x, curve.state.y);
-    curveVertex(curve.state.x, curve.state.y);
-    endShape();
+    // curveVertex(curve.state.x, curve.state.y);
+    // curveVertex(curve.state.x, curve.state.y);
+    // endShape();
   });
 }
 
@@ -158,7 +161,7 @@ class CurveWalk {
     const closestState = this.getClosestTargetState();
     while (steps) {
       this.state.s += 1;
-      const turn = this.state.theta - this.state.theta % (PI / 4);
+      const turn = this.state.theta// - this.state.theta % (PI / 3);
       this.state.x += cos(turn) * this.stepSize;
       this.state.y += sin(turn) * this.stepSize;
       this.state.theta += this.state.k;
