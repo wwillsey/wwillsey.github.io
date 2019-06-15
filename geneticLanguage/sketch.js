@@ -8,20 +8,25 @@ const operators = [
   '-',
   'sin',
   'cos',
+  'atan',
   '*',
   '/',
   'dist',
-  'rotate'
+  'dup',
+  // 'drop',
+  'rotate',
+  // 'exp',
 ];
 const symbols = [
   'x',
   'y',
   'distFromMiddle',
-  'w',
-  'h',
+  // 'w',
+  // 'h',
+  't',
 ];
-const programLength = 10;
-const mutateBy = 1;
+const programLength = 25;
+const mutateBy = 2;
 
 function keyPressed(){
   switch (keyCode) {
@@ -47,20 +52,28 @@ function mousePressed() {
 
 function setup() {
   createCanvas(800, 800);
-  containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(50, 50, row, col)));
+  containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(20, 20, row, col)));
   // noLoop();
   noSmooth()
-  containers.forEach(row => row.forEach(container => container.render()));
-
+  renderAll();
 }
 
 function draw() {
+  renderAll()
+  showExpHovered();
+}
+
+function showExpHovered() {
   fill(color(0))
   rect(0,0, width, 20);
   fill(color('white'));
   const container = selectAtMouse();
   if (container)
     text(container.exp.map(val => typeof(val) === 'number' ? val.toFixed(3) : val), 10, 10);
+}
+
+function renderAll() {
+  containers.forEach(row => row.forEach(container => container.render()));
 }
 
 function getRandomFrom(l, notThis) {
@@ -76,7 +89,7 @@ function genTerm() {
   if (rand < .1) {
     return random(-1,1)
   }
-  if (rand < .2) {
+  if (rand < .3) {
     return getRandomFrom(symbols)
   }
   return getRandomFrom(operators)
@@ -91,17 +104,24 @@ function render(exp, canvas) {
   canvas.strokeWeight(0);
   for(let y = 0; y < canvas.height; y++) {
     for(let x = 0; x < canvas.width; x++) {
+      const t = (frameCount) / 3;
       const env = {
-        x,
-        y,
-        distFromMiddle: dist(canvas.width / 2, canvas.height / 2, x, y),
-        h: canvas.height,
-        w: canvas.width,
+        x: map(x, 0, canvas.width, -1, 1, true),
+        y: map(y, 0, canvas.height, -1, 1, true),
+        distFromMiddle: map(dist(canvas.width / 2, canvas.height / 2, x, y), 0, dist(canvas.width / 2, canvas.height / 2,0,0), 0, 1),
+        // h: canvas.height,
+        // w: canvas.width,
+        t,//: t > 1 ? 2-t : t,
       };
 
-      const res = evalExp(exp, env).map(val => constrain(abs(val) * 255, 0, 255));
+      const res = evalExp(exp, env).map(val => {
+        if (val > 1) {
+          // print(val)
+        }
+        return constrain(abs(val) * 255, 0, 255)
+      });
+      // print(x,y,map(x, 0, canvas.width, -1, 1, true), map(y, 0, canvas.height, -1, 1, true), res);
       const resultColor = color(res);
-      // const resultColor = color((x + y) * 10);
       canvas.stroke(resultColor);
       canvas.point(x,y);
     }
@@ -124,12 +144,17 @@ function evalExp(exp, env) {
       case '-': stack.push(pop() - pop()); break;
       case 'sin': stack.push(sin(pop())); break;
       case 'cos': stack.push(cos(pop())); break;
+      case 'cos': stack.push(cos(pop())); break;
       case '/': stack.push(safeDivide(pop(), pop())); break;
       case '*': stack.push(pop() * pop()); break;
       case 'dist': stack.push(dist(pop(), pop(), pop(), pop())); break;
+      case 'dup': const x = pop(); stack.push(x); stack.push(x); break;
+      case 'drop': pop(); break;
       case 'rotate': stack.length > 0 && stack.push(stack.splice(0,1)[0]); break;
+      case 'exp': stack.push(pow(stack.pop(), stack.pop())); break;
+      case 'atan': stack.push(atan2(pop(), pop())); break;
       default:
-        stack.push(env[val] || val);
+        stack.push(env[val] != undefined ? env[val] : val);
     }
   });
   return [pop(), pop(), pop()];
@@ -197,6 +222,12 @@ class Container {
     const y = this.row * height / rows;
     render(this.exp, this.canvas);
     image(this.canvas, x, y, width / cols, height / cols);
+
+    if (this.selected) {
+      fill(169, 32, 54, 100);
+      noStroke();
+      rect(x, y, width / cols, height / cols);
+    }
   }
 
   toggleSelection() {
