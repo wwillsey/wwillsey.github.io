@@ -5,7 +5,7 @@ let backgroundGradient = {}
 
 const isHSB = false;
 const backgroundEnabled = true;
-const useBackgroundSourceImage = true;
+const useBackgroundSourceImage = false;
 const maxColorVal = isHSB ? 100 : 255;
 const backgroundSplitMean = .993;
 const backgroundSplitVariance = .1;
@@ -25,7 +25,7 @@ const isGreyscale = false;
 
 
 let stdDevs;
-const stdDevFn = () => randomGaussian(5, 0.01)
+const stdDevFn = () => randomGaussian(2, 0.01)
 let data;
 
 
