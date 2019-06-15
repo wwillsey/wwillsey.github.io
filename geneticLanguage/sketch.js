@@ -1,10 +1,27 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
 
-let rows = 4;
-let cols = 4;
-const operators = ['+', '-', 'sin'];
-const symbols = ['x', 'y'];
+let rows = 5;
+let cols = 5;
+const operators = [
+  '+',
+  '-',
+  'sin',
+  'cos',
+  '*',
+  '/',
+  'dist',
+  'rotate'
+];
+const symbols = [
+  'x',
+  'y',
+  'distFromMiddle',
+  'w',
+  'h',
+];
+const programLength = 10;
+const mutateBy = 1;
 
 function keyPressed(){
   switch (keyCode) {
@@ -14,25 +31,36 @@ function keyPressed(){
   }
 }
 
-function mouseClicked() {
+function selectAtMouse() {
   const col = floor(mouseX / width * cols);
   const row = floor(mouseY / height * rows);
 
   if (col < cols && row < rows) {
-    containers[row][col].toggleSelection();
+    return containers[row][col];
   }
+}
+
+function mousePressed() {
+  selectAtMouse().toggleSelection();
 }
 
 
 function setup() {
   createCanvas(800, 800);
-  containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(100, 100, row, col)));
-  noLoop();
+  containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(50, 50, row, col)));
+  // noLoop();
   noSmooth()
+  containers.forEach(row => row.forEach(container => container.render()));
+
 }
 
 function draw() {
-  containers.forEach(row => row.forEach(container => container.render()));
+  fill(color(0))
+  rect(0,0, width, 20);
+  fill(color('white'));
+  const container = selectAtMouse();
+  if (container)
+    text(container.exp.map(val => typeof(val) === 'number' ? val.toFixed(3) : val), 10, 10);
 }
 
 function getRandomFrom(l, notThis) {
@@ -43,17 +71,19 @@ function getRandomFrom(l, notThis) {
   return choice;
 }
 
-function genExp(depth) {
-  const val = random();
-  if (depth === 0 || val < .1)
+function genTerm() {
+  const rand = random();
+  if (rand < .1) {
+    return random(-1,1)
+  }
+  if (rand < .2) {
     return getRandomFrom(symbols)
-  if (val < .2)
-    return random(-1, 1);
-  else
-    return {
-      op: getRandomFrom(operators),
-      children: Array.from({length: 2}, () => genExp(depth-1))
-    }
+  }
+  return getRandomFrom(operators)
+}
+
+function genExp(length) {
+  return Array.from({length}, genTerm)
 }
 
 function render(exp, canvas) {
@@ -62,10 +92,15 @@ function render(exp, canvas) {
   for(let y = 0; y < canvas.height; y++) {
     for(let x = 0; x < canvas.width; x++) {
       const env = {
-        x, y,
+        x,
+        y,
+        distFromMiddle: dist(canvas.width / 2, canvas.height / 2, x, y),
+        h: canvas.height,
+        w: canvas.width,
       };
-      const result = abs(evalExp(exp, env) * 255);
-      const resultColor = color(constrain(result, 0, 255));
+
+      const res = evalExp(exp, env).map(val => constrain(abs(val) * 255, 0, 255));
+      const resultColor = color(res);
       // const resultColor = color((x + y) * 10);
       canvas.stroke(resultColor);
       canvas.point(x,y);
@@ -73,77 +108,86 @@ function render(exp, canvas) {
   }
 }
 
+function safeDivide(a,b) {
+  return b === 0 ? 0 : a / b;
+}
+
 
 function evalExp(exp, env) {
-  switch (typeof(exp)) {
-    case 'number':
-      return exp;
-    case 'string':
-      return env[exp]
-    case 'object':
-      const op = exp.op;
-      const childrenVals = exp.children.map(child => evalExp(child, env));
-      switch (op) {
-        case '+':
-          return childrenVals.reduce((x,y) => x + y, 0)
-        case '-':
-          return childrenVals.reduce((x,y) => x - y, 0)
-        case 'sin':
-          return sin(childrenVals[0])
-      }
+  const stack = [];
+  const pop = () => {
+    return stack.pop() || 0;
   }
+  exp.forEach(val => {
+    switch (val) {
+      case '+': stack.push(pop() + pop()); break;
+      case '-': stack.push(pop() - pop()); break;
+      case 'sin': stack.push(sin(pop())); break;
+      case 'cos': stack.push(cos(pop())); break;
+      case '/': stack.push(safeDivide(pop(), pop())); break;
+      case '*': stack.push(pop() * pop()); break;
+      case 'dist': stack.push(dist(pop(), pop(), pop(), pop())); break;
+      case 'rotate': stack.length > 0 && stack.push(stack.splice(0,1)[0]); break;
+      default:
+        stack.push(env[val] || val);
+    }
+  });
+  return [pop(), pop(), pop()];
 }
 
 function expToString(exp) {
-  switch (typeof(exp)) {
-    case 'number':
-    case 'string':
-      return exp
-    case 'object':
-      const op = exp.op;
-      const childrenVals = exp.children.map(child => expToString(child)).join(' ');
-      return `(${op} ${childrenVals})`;
+  return exp.join(' ');
+}
+
+function mutateExp(exp) {
+  const res = exp.slice();
+  if (random() < .5) {
+    let n = mutateBy;
+    while (n--) {
+      const idx = floor(random(0, res.length));
+      res[idx] = genTerm();
     }
+  } else {
+    const idx = floor(random(0, res.length));
+    res.push(...res.splice(idx, 4))
+  }
+  return res;
+}
+
+function mergeExps(expDest, expSrc) {
+  const res = expDest.slice()
+  const idx1 = floor(random(0, expDest.length))
+  const idx2 = floor(random(0, expDest.length))
+  // print(idx1, idx2)
+  arrayCopy(expSrc, min(idx1, idx2), res, min(idx1, idx2), abs(idx1 - idx2));
+  return res;
 }
 
 function cull() {
   const toKill = []
   const survivors = []
   containers.forEach(row => row.forEach(container => {
-    const toAddTo = container.selected ? toKill : survivors;
+    const toAddTo = container.selected ? survivors : toKill;
     toAddTo.push(container);
   }));
 
   toKill.forEach(container => {
-    container.exp = _.clone(random(survivors).exp);
-    container.mutate();
-    container.toggleSelection();
+    const survivor = random(survivors);
+    container.exp = random() < .5 ?
+      mutateExp(survivor.exp) :
+      mergeExps(random(survivors).exp, survivor.exp);
+    // container.render();
   })
+  survivors.forEach(container => container.toggleSelection())
+  containers.forEach(row => row.forEach(container => container.render()));
 }
 
-function mutateExp(exp) {
-  switch (typeof(exp)) {
-    case 'number':
-      return random(-1, 1);
-    case 'string':
-      return getRandomFrom(symbols, exp);
-    case 'object':
-      if (random() < .9) {
-        const idx = random(0, exp.children.length);
-        exp.children[idx] = mutateExp(exp.children[idx]);
-      } else {
-        exp.op = random(operators);
-      }
-      return exp;
-  }
-}
 
 class Container {
   constructor(w,h, row, col) {
     this.canvas = createGraphics(w, h);
     this.selected = false;
-    this.expDepth = 5;
-    this.exp = genExp(this.expDepth);
+    this.exp = genExp(programLength);
     this.row = row;
     this.col = col;
   }
@@ -155,16 +199,12 @@ class Container {
     image(this.canvas, x, y, width / cols, height / cols);
   }
 
-  mutate() {
-    this.exp = mutateExp(this.exp);
-  }
-
   toggleSelection() {
     const x = this.col * width / cols;
     const y = this.row * height / rows;
     this.selected = !this.selected;
     if (this.selected) {
-      fill(169, 32, 54, 50);
+      fill(169, 32, 54, 100);
       noStroke();
       rect(x, y, width / cols, height / cols);
     } else {
