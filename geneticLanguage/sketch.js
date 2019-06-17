@@ -8,25 +8,44 @@ const operators = [
   '-',
   'sin',
   'cos',
-  'atan',
+  // 'atan',
   '*',
-  '/',
-  'dist',
-  'dup',
+  // '/',
+  // 'dist',
+  // 'dup',
   // 'drop',
-  'rotate',
+  // 'rotate',
   // 'exp',
 ];
 const symbols = [
-  'x',
-  'y',
-  'distFromMiddle',
+  'pos'
+  // 'distFromMiddle',
   // 'w',
   // 'h',
-  't',
+  // 't',
 ];
 const programLength = 25;
 const mutateBy = 2;
+
+let geneticShader;
+
+const geneticVert = `
+attribute vec3 aPosition;
+attribute vec2 aTexCoord;
+varying vec2 vTexCoord;
+
+void main() {
+  vTexCoord = aTexCoord;
+  vec4 positionVec4 = vec4(aPosition, 1.0);
+  positionVec4.xy = positionVec4.xy * 2.0 - 1.0;
+  gl_Position = positionVec4;
+}
+`;
+
+// function preload(){
+//   // load the shader
+//   geneticShader = loadShader('genetic.vert', 'genetic.frag');
+// }
 
 function keyPressed(){
   switch (keyCode) {
@@ -51,16 +70,102 @@ function mousePressed() {
 
 
 function setup() {
-  createCanvas(800, 800);
-  containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(20, 20, row, col)));
-  // noLoop();
-  noSmooth()
-  renderAll();
+  // shaders require WEBGL mode to work
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  noStroke();
+
+  const exp = genExp(10);
+
+  const compiled = compileExp(exp);
+  print(compiled)
+  geneticShader = createShader(geneticVert, compiled);
 }
 
 function draw() {
-  renderAll()
-  showExpHovered();
+  // shader() sets the active shader with our shader
+  fill(0)
+
+  shader(geneticShader);
+
+  // geneticShader.setUniform('expOps', [0,1])
+  // geneticShader.setUniform('expVals', [[0.0, 0.1, 0.2], null, [0.0, 0.1, 0.2]])
+
+
+  // rect gives us some geometry on the screen
+  rect(0,0,100, 100);
+}
+
+
+// function setup() {
+//   createCanvas(800, 800, WEBGL);
+//   containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(20, 20, row, col)));
+//   // noLoop();
+//   noSmooth()
+//   renderAll();
+// }
+
+// function draw() {
+//   renderAll()
+//   showExpHovered();
+// }
+
+
+function compileExp(exp) {
+  let result = ''
+  let i = 0;
+  let maxi = 0;
+  const push = (val) => {
+    result += `    x_${i} = ${val};\n`;
+    i++;
+    maxi = max(maxi, i);
+  }
+  const pop = () => {
+    if (i == 0) {
+      return 'none'
+    } else {
+      i--;
+      return `x_${i}`
+    }
+  }
+
+  exp.forEach(val => {
+    switch (val) {
+      case '+': push(`${pop()} + ${pop()}`); break;
+      case '-': push(`${pop()} - ${pop()}`); break;
+      case 'sin': push(`sin(${pop()})`); break;
+      case 'cos': push(`cos(${pop()})`); break;
+      // case '/': push(safeDivide(pop(), pop())); break;
+      case '*': push(`${pop()} * ${pop()}`); break;
+      // case 'dist': push(dist(pop(), pop(), pop(), pop())); break;
+      // case 'dup': const x = pop(); push(x); push(x); break;
+      // case 'drop': pop(); break;
+      // case 'rotate': length > 0 && push(splice(0,1)[0]); break;
+      // case 'exp': push(pow(pop(), pop())); break;
+      // case 'atan': push(atan2(pop(), pop())); break;
+      default:
+        // push(env[val] != undefined ? env[val] : val);
+        push(val)
+    }
+  });
+
+
+  return `
+    precision highp float;
+    varying vec2 vTexCoord;
+
+    void main() {
+      vec3 none = vec3(0.0, 0.0, 0.0);
+      vec3 pos = vec3(vTexCoord.x, vTexCoord.y, 0.0);
+    ${Array.from({length: maxi}, (v, i) => `vec3 x_${i}`).join(';\n')};
+      ${result}
+    gl_FragColor = vec4(${pop()}, 1.0);
+}`;
+}
+
+function genShader(exp){
+  exp.forEach(op => {
+
+  })
 }
 
 function showExpHovered() {
@@ -87,7 +192,7 @@ function getRandomFrom(l, notThis) {
 function genTerm() {
   const rand = random();
   if (rand < .1) {
-    return random(-1,1)
+    return `vec3(${random()}, ${random()}, ${random()})`;
   }
   if (rand < .3) {
     return getRandomFrom(symbols)
@@ -210,7 +315,7 @@ function cull() {
 
 class Container {
   constructor(w,h, row, col) {
-    this.canvas = createGraphics(w, h);
+    this.canvas = createGraphics(w, h, WEBGL);
     this.selected = false;
     this.exp = genExp(programLength);
     this.row = row;
