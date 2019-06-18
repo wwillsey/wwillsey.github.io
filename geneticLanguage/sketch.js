@@ -1,8 +1,9 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
+let music, amplitude;
 
-let rows = 5;
-let cols = 5;
+let rows = 3;
+let cols = 3;
 const operators = [
   '+',
   '-',
@@ -21,6 +22,7 @@ const symbols = [
   'x',
   'y',
   'distFromMiddle',
+  'amp',
   // 'w',
   // 'h',
   't',
@@ -28,11 +30,18 @@ const symbols = [
 const programLength = 25;
 const mutateBy = 2;
 
+function preload() {
+  music = loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3');
+}
+
 function keyPressed(){
   switch (keyCode) {
     case ENTER:
       cull();
       // redraw();
+      break;
+    case BACKSPACE:
+      remove();
   }
 }
 
@@ -51,16 +60,23 @@ function mousePressed() {
 
 
 function setup() {
-  createCanvas(800, 800);
+  createCanvas(1400, 800);
   containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(20, 20, row, col)));
   // noLoop();
   noSmooth()
+  music.play();
+  amplitude = new p5.Amplitude();
+  frameRate(60)
   renderAll();
 }
 
 function draw() {
   renderAll()
   showExpHovered();
+  fill(255);
+  var level = amplitude.getLevel();
+  var size = map(level, 0, 1, 0, 200);
+  ellipse(width/2, height/2, size, size);
 }
 
 function showExpHovered() {
@@ -102,6 +118,7 @@ function genExp(length) {
 function render(exp, canvas) {
   canvas.background(0);
   canvas.strokeWeight(0);
+  const amp = amplitude.getLevel();
   for(let y = 0; y < canvas.height; y++) {
     for(let x = 0; x < canvas.width; x++) {
       const t = (frameCount) / 3;
@@ -109,6 +126,7 @@ function render(exp, canvas) {
         x: map(x, 0, canvas.width, -1, 1, true),
         y: map(y, 0, canvas.height, -1, 1, true),
         distFromMiddle: map(dist(canvas.width / 2, canvas.height / 2, x, y), 0, dist(canvas.width / 2, canvas.height / 2,0,0), 0, 1),
+        amp,
         // h: canvas.height,
         // w: canvas.width,
         t,//: t > 1 ? 2-t : t,
@@ -144,7 +162,7 @@ function evalExp(exp, env) {
       case '-': stack.push(pop() - pop()); break;
       case 'sin': stack.push(sin(pop())); break;
       case 'cos': stack.push(cos(pop())); break;
-      case 'cos': stack.push(cos(pop())); break;
+      case 'atan': stack.push(atan2(pop(), pop())); break;
       case '/': stack.push(safeDivide(pop(), pop())); break;
       case '*': stack.push(pop() * pop()); break;
       case 'dist': stack.push(dist(pop(), pop(), pop(), pop())); break;
