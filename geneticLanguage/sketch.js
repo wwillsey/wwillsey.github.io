@@ -26,12 +26,13 @@ const symbols = [
   'y',
   'distFromMiddle',
   'time',
+  'musicAmplitude',
 ];
 const programLength = 55;
 const mutateBy = 2;
 
 let geneticShader;
-
+let music, amplitude;
 // DONT CHANGE THIS
 const geneticVert = `
 attribute vec3 aPosition;
@@ -47,11 +48,19 @@ void main() {
 `;
 
 
+function preload() {
+  music = loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3');
+}
+
+
+
 function keyPressed(){
   switch (keyCode) {
     case ENTER:
       cull();
       // redraw();
+    case SPACE:
+      music.isPlaying() ? music.pause() : music.play();
   }
 }
 
@@ -80,6 +89,8 @@ function setup() {
   const compiled = compileExp(exp);
   print(compiled)
   geneticShader = createShader(geneticVert, compiled);
+
+  amplitude = p5.Amplitude();
 }
 
 function draw() {
@@ -90,6 +101,9 @@ function draw() {
 
   const time = sin(frameCount * 0.01);
   geneticShader.setUniform('time', time);
+
+  const amp = amplitude.getLevel() || 0;
+  geneticShader.setUniform('musicAmplitude', amp);
 
   rect(0,0,1,1)
 }
