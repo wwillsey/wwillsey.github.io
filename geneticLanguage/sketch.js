@@ -10,7 +10,7 @@ const operators = [
   'cos',
   // 'atan',
   '*',
-  // '/',
+  '/',
   // 'dist',
   // 'dup',
   // 'drop',
@@ -18,17 +18,18 @@ const operators = [
   // 'exp',
 ];
 const symbols = [
-  'pos'
-  // 'distFromMiddle',
+  'pos',
+  'distFromMiddle',
   // 'w',
   // 'h',
-  // 't',
+  'time',
 ];
-const programLength = 25;
+const programLength = 55;
 const mutateBy = 2;
 
 let geneticShader;
 
+// DONT CHANGE THIS
 const geneticVert = `
 attribute vec3 aPosition;
 attribute vec2 aTexCoord;
@@ -42,10 +43,6 @@ void main() {
 }
 `;
 
-// function preload(){
-//   // load the shader
-//   geneticShader = loadShader('genetic.vert', 'genetic.frag');
-// }
 
 function keyPressed(){
   switch (keyCode) {
@@ -74,7 +71,7 @@ function setup() {
   createCanvas(windowWidth, windowHeight, WEBGL);
   noStroke();
 
-  const exp = genExp(10);
+  const exp = genExp(25);
 
   const compiled = compileExp(exp);
   print(compiled)
@@ -83,31 +80,15 @@ function setup() {
 
 function draw() {
   // shader() sets the active shader with our shader
-  fill(0)
+  // fill(0)
 
   shader(geneticShader);
 
-  // geneticShader.setUniform('expOps', [0,1])
-  // geneticShader.setUniform('expVals', [[0.0, 0.1, 0.2], null, [0.0, 0.1, 0.2]])
+  const time = sin(frameCount * 0.01);
+  geneticShader.setUniform('time', [time, time, time]);
 
-
-  // rect gives us some geometry on the screen
-  rect(0,0,100, 100);
+  rect(0,0,1,1)
 }
-
-
-// function setup() {
-//   createCanvas(800, 800, WEBGL);
-//   containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (vv, col) => new Container(20, 20, row, col)));
-//   // noLoop();
-//   noSmooth()
-//   renderAll();
-// }
-
-// function draw() {
-//   renderAll()
-//   showExpHovered();
-// }
 
 
 function compileExp(exp) {
@@ -134,7 +115,7 @@ function compileExp(exp) {
       case '-': push(`${pop()} - ${pop()}`); break;
       case 'sin': push(`sin(${pop()})`); break;
       case 'cos': push(`cos(${pop()})`); break;
-      // case '/': push(safeDivide(pop(), pop())); break;
+      case '/': push(`${pop()} / ${pop()}`); break;
       case '*': push(`${pop()} * ${pop()}`); break;
       // case 'dist': push(dist(pop(), pop(), pop(), pop())); break;
       // case 'dup': const x = pop(); push(x); push(x); break;
@@ -153,19 +134,17 @@ function compileExp(exp) {
     precision highp float;
     varying vec2 vTexCoord;
 
+    uniform vec3 time;
+
     void main() {
       vec3 none = vec3(0.0, 0.0, 0.0);
       vec3 pos = vec3(vTexCoord.x, vTexCoord.y, 0.0);
+      vec3 distFromMiddle = vec3(abs(pos.x), abs(pos.y), 0.0);
+      pos *= 20.0;
     ${Array.from({length: maxi}, (v, i) => `vec3 x_${i}`).join(';\n')};
       ${result}
     gl_FragColor = vec4(${pop()}, 1.0);
 }`;
-}
-
-function genShader(exp){
-  exp.forEach(op => {
-
-  })
 }
 
 function showExpHovered() {
@@ -191,10 +170,10 @@ function getRandomFrom(l, notThis) {
 
 function genTerm() {
   const rand = random();
-  if (rand < .1) {
+  if (rand < .2) {
     return `vec3(${random()}, ${random()}, ${random()})`;
   }
-  if (rand < .3) {
+  if (rand < .4) {
     return getRandomFrom(symbols)
   }
   return getRandomFrom(operators)
@@ -249,7 +228,7 @@ function evalExp(exp, env) {
       case '-': stack.push(pop() - pop()); break;
       case 'sin': stack.push(sin(pop())); break;
       case 'cos': stack.push(cos(pop())); break;
-      case 'cos': stack.push(cos(pop())); break;
+      // case 'cos': stack.push(cos(pop())); break;
       case '/': stack.push(safeDivide(pop(), pop())); break;
       case '*': stack.push(pop() * pop()); break;
       case 'dist': stack.push(dist(pop(), pop(), pop(), pop())); break;
