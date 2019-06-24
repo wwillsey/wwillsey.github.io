@@ -3,25 +3,28 @@ let containers;
 
 let rows = 5;
 let cols = 5;
+
+let xResolution = 50;
+let yResolution = 50;
+
 const operators = [
   '+',
   '-',
   'sin',
   'cos',
-  // 'atan',
+  'atan',
   '*',
   '/',
-  // 'dist',
-  // 'dup',
+  'dist',
+  'dup',
   // 'drop',
   // 'rotate',
-  // 'exp',
+  'pow',
 ];
 const symbols = [
-  'pos',
+  'x',
+  'y',
   'distFromMiddle',
-  // 'w',
-  // 'h',
   'time',
 ];
 const programLength = 55;
@@ -70,6 +73,7 @@ function setup() {
   // shaders require WEBGL mode to work
   createCanvas(windowWidth, windowHeight, WEBGL);
   noStroke();
+  frameRate(60);
 
   const exp = genExp(25);
 
@@ -85,7 +89,7 @@ function draw() {
   shader(geneticShader);
 
   const time = sin(frameCount * 0.01);
-  geneticShader.setUniform('time', [time, time, time]);
+  geneticShader.setUniform('time', time);
 
   rect(0,0,1,1)
 }
@@ -117,12 +121,12 @@ function compileExp(exp) {
       case 'cos': push(`cos(${pop()})`); break;
       case '/': push(`${pop()} / ${pop()}`); break;
       case '*': push(`${pop()} * ${pop()}`); break;
-      // case 'dist': push(dist(pop(), pop(), pop(), pop())); break;
-      // case 'dup': const x = pop(); push(x); push(x); break;
+      case 'dist': const [a,b,c,d] = [pop(), pop(), pop(), pop()]; push(`pow(${a} - ${c}, 2.0) + pow(${b} - ${d}, 2.0)`); break;
+      case 'dup': const x = pop(); push(x); push(x); break;
       // case 'drop': pop(); break;
       // case 'rotate': length > 0 && push(splice(0,1)[0]); break;
-      // case 'exp': push(pow(pop(), pop())); break;
-      // case 'atan': push(atan2(pop(), pop())); break;
+      case 'pow': push(`pow(${pop()}, ${pop()})`); break;
+      case 'atan': push(`atan(${pop()}, ${pop()})`); break;
       default:
         // push(env[val] != undefined ? env[val] : val);
         push(val)
@@ -134,16 +138,19 @@ function compileExp(exp) {
     precision highp float;
     varying vec2 vTexCoord;
 
-    uniform vec3 time;
+    uniform float time;
 
     void main() {
-      vec3 none = vec3(0.0, 0.0, 0.0);
-      vec3 pos = vec3(vTexCoord.x, vTexCoord.y, 0.0);
-      vec3 distFromMiddle = vec3(abs(pos.x), abs(pos.y), 0.0);
-      pos *= 20.0;
-    ${Array.from({length: maxi}, (v, i) => `vec3 x_${i}`).join(';\n')};
+      float none = 0.0;
+      float x = vTexCoord.x;
+      float y = vTexCoord.y;
+      x = x - mod(x, 1.0 / ${xResolution}.0);
+      y = y - mod(y, 1.0 / ${yResolution}.0);
+      float distFromMiddle = pow(x - 0.5, 2.0) + pow(y - 0.5, 2.0);
+
+    ${Array.from({length: maxi}, (v, i) => `float x_${i}`).join(';\n')};
       ${result}
-    gl_FragColor = vec4(${pop()}, 1.0);
+    gl_FragColor = vec4(${pop()}, ${pop()}, ${pop()}, 1.0);
 }`;
 }
 
@@ -171,7 +178,9 @@ function getRandomFrom(l, notThis) {
 function genTerm() {
   const rand = random();
   if (rand < .2) {
-    return `vec3(${random()}, ${random()}, ${random()})`;
+    // return `vec3(${random()}, ${random()}, ${random()})`;
+    return `${random()}`;
+
   }
   if (rand < .4) {
     return getRandomFrom(symbols)
