@@ -25,14 +25,18 @@ const symbols = [
   'x',
   'y',
   'distFromMiddle',
-  'time',
+  // 'time',
   'musicAmplitude',
 ];
 const programLength = 55;
 const mutateBy = 2;
 
 let geneticShader;
-let music, amplitude;
+let music;
+
+let amplitude, amplitudeVals, amplitudeSum;
+
+
 // DONT CHANGE THIS
 const geneticVert = `
 attribute vec3 aPosition;
@@ -59,8 +63,13 @@ function keyPressed(){
     case ENTER:
       cull();
       // redraw();
-    case SPACE:
-      music.isPlaying() ? music.pause() : music.play();
+  }
+}
+
+function keyPressed() {
+  switch (key) {
+    case ' ':
+        music.isPlaying() ? music.pause() : music.play();
   }
 }
 
@@ -90,7 +99,9 @@ function setup() {
   print(compiled)
   geneticShader = createShader(geneticVert, compiled);
 
-  amplitude = p5.Amplitude();
+  amplitudeSum = 0;
+  amplitudeVals = []
+  amplitude = new p5.Amplitude();
 }
 
 function draw() {
@@ -103,7 +114,15 @@ function draw() {
   geneticShader.setUniform('time', time);
 
   const amp = amplitude.getLevel() || 0;
-  geneticShader.setUniform('musicAmplitude', amp);
+
+  amplitudeVals.push(amp);
+  amplitudeSum += amp;
+  if (amplitudeVals.length > 100) {
+    amplitudeSum -= amplitudeVals.splice(0,1)[0];
+  }
+  const amplitudeMean = amplitudeSum / amplitudeVals.length
+  // print(amplitudeMean);
+  geneticShader.setUniform('musicAmplitude', pow(max(amp - amplitudeMean, 0), 2));
 
   rect(0,0,1,1)
 }
@@ -153,6 +172,7 @@ function compileExp(exp) {
     varying vec2 vTexCoord;
 
     uniform float time;
+    uniform float musicAmplitude;
 
     void main() {
       float none = 0.0;
@@ -191,7 +211,7 @@ function getRandomFrom(l, notThis) {
 
 function genTerm() {
   const rand = random();
-  if (rand < .2) {
+  if (rand < .1) {
     // return `vec3(${random()}, ${random()}, ${random()})`;
     return `${random()}`;
 
