@@ -1,14 +1,19 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
 
-let rows = 2;
-let cols = 3;
+let rows = 3;
+let cols = 4;
 
-let xResolution = 100;
-let yResolution = 100;
+let xResolution = 200;
+let yResolution = 200;
 
-const programLength = 50;
+const programLength = 150;
 const mutateBy = 2;
+
+const useMusic = true;
+const useBackgroundImage = true;
+const useCamera = true;
+let backgroundImage;
 
 
 let time = 0;
@@ -27,6 +32,9 @@ const operators = [
   // 'drop',
   // 'rotate',
   'pow',
+  'getFromBackgroundRed',
+  'getFromBackgroundGreen',
+  'getFromBackgroundBlue',
 ];
 const symbols = [
   'x',
@@ -34,6 +42,9 @@ const symbols = [
   'distFromMiddle',
   'time',
   'musicAmplitude',
+  'backgroundImageRed',
+  'backgroundImageGreen',
+  'backgroundImageBlue',
 ];
 
 let geneticShader;
@@ -58,7 +69,9 @@ void main() {
 
 
 function preload() {
-  music = loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3');
+  music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
+  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
+  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/face3.jpg') : null;
 }
 
 
@@ -72,7 +85,7 @@ function keyPressed(){
   }
   switch (key) {
     case ' ':
-        music.isPlaying() ? music.pause() : music.play();
+      if (useMusic) music.isPlaying() ? music.pause() : music.play();
   }
 }
 
@@ -93,8 +106,8 @@ function mousePressed() {
 
 function setup() {
   // shaders require WEBGL mode to work
-  createCanvas(windowWidth, windowHeight, WEBGL);
-  // createCanvas(1000, 1000, WEBGL);
+  // createCanvas(windowWidth, windowHeight, WEBGL);
+  createCanvas(displayWidth, displayHeight, WEBGL);
   noStroke();
   frameRate(60);
 
@@ -104,6 +117,14 @@ function setup() {
   amplitudeSum = 0;
   amplitudeVals = []
   amplitude = new p5.Amplitude();
+
+  if(useCamera) {
+    cam = createCapture(VIDEO);
+    cam.size(windowWidth, windowHeight);
+
+    // hide the html element that createCapture adds to the screen
+    cam.hide();
+  }
 }
 
 function updateShader() {
@@ -133,11 +154,10 @@ function draw() {
 
   time += .01;
 
-  if (frameCount % 10 === 0)
-    print(frameRate())
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
   geneticShader.setUniform('musicAmplitude', ampToAdd);
+  geneticShader.setUniform('backgroundImage', useCamera ? cam : backgroundImage);
 
   rect(0,0,width, height);
 }
@@ -147,12 +167,15 @@ function generateShader(containers) {
   const containerExpsCompiled = [];
   containers.forEach(row => row.forEach(container => containerExpsCompiled.push(container.compileExp())));
 
+  const blockWidth = width / cols * 2;
+  const blockHeight = height / rows * 2;
   return `
   precision highp float;
   varying vec2 vTexCoord;
 
   uniform float time;
   uniform float musicAmplitude;
+  uniform sampler2D backgroundImage;
 
   const vec2 resolution = vec2(${width}.0, ${height}.0);
 
@@ -178,6 +201,29 @@ function generateShader(containers) {
     float x;
     float y;
     float distFromMiddle;
+    vec4 backgroundImageVal;
+    float backgroundImageRed = 0.0;
+    float backgroundImageGreen = 0.0;
+    float backgroundImageBlue = 0.0;
+
+
+    x = gl_FragCoord.x;
+    y = gl_FragCoord.y;
+
+    x = mod(x, ${(blockWidth).toFixed(10)});
+    y = mod(y, ${(blockHeight).toFixed(10)});
+
+    x = x - mod(x, ${(blockWidth / xResolution).toFixed(10)});
+    y = y - mod(y, ${(blockHeight / yResolution).toFixed(10)});
+    x /= ${(blockWidth).toFixed(10)};
+    y /= ${(blockHeight).toFixed(10)};
+    y = 1.0 - y;
+    distFromMiddle = pow(x - 0.5, 2.0) + pow(y - 0.5, 2.0);
+    backgroundImageVal = texture2D(backgroundImage, vec2(x, y));
+    backgroundImageRed = backgroundImageVal.r;
+    backgroundImageGreen = backgroundImageVal.g;
+    backgroundImageBlue = backgroundImageVal.b;
+
 
     float width = resolution.x / ${cols}.0;
     float height = resolution.y / ${rows}.0;
@@ -325,27 +371,18 @@ class Container {
         // case 'rotate': length > 0 && push(splice(0,1)[0]); break;
         case 'pow': push(`pow(${pop()}, ${pop()})`); break;
         case 'atan': push(`atan(${pop()}, ${pop()})`); break;
+        case 'getFromBackgroundRed': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).r`); break;
+        case 'getFromBackgroundBlue': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).g`); break;
+        case 'getFromBackgroundGreen': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).b`); break;
+
         default:
           // push(env[val] != undefined ? env[val] : val);
           push(val)
       }
     });
 
-    const blockWidth = width / cols * 2;
-    const blockHeight = height / rows * 2;
+
     return `
-    x = gl_FragCoord.x;
-    y = gl_FragCoord.y;
-
-    x = mod(x, ${(blockWidth).toFixed(10)});
-    y = mod(y, ${(blockHeight).toFixed(10)});
-
-    x = x - mod(x, ${(blockWidth / xResolution).toFixed(10)});
-    y = y - mod(y, ${(blockHeight / yResolution).toFixed(10)});
-    x /= ${(blockWidth).toFixed(10)};
-    y /= ${(blockHeight).toFixed(10)};
-    distFromMiddle = pow(x - 0.5, 2.0) + pow(y - 0.5, 2.0);
-
     ${Array.from({length: maxi}, (v, i) => `float x_${this.id}_${i}`).join(';\n')};
     ${result}
 
