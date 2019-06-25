@@ -1,14 +1,17 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
 
-let rows = 4;
-let cols = 4;
+let rows = 3;
+let cols = 5;
 
-let xResolution = 20;
-let yResolution = 20;
+let xResolution = 50;
+let yResolution = 50;
 
-const programLength = 30;
+const programLength = 50;
 const mutateBy = 2;
+
+
+let time = 0;
 
 
 const operators = [
@@ -64,16 +67,15 @@ function keyPressed(){
   switch (keyCode) {
     case ENTER:
       cull();
+      time = 0;
       // redraw();
   }
-}
-
-function keyPressed() {
   switch (key) {
     case ' ':
         music.isPlaying() ? music.pause() : music.play();
   }
 }
+
 
 function selectAtMouse() {
   const col = floor(mouseX / width * cols);
@@ -91,19 +93,23 @@ function mousePressed() {
 
 function setup() {
   // shaders require WEBGL mode to work
-  // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(1000, 1000, WEBGL);
+  createCanvas(windowWidth, windowHeight, WEBGL);
+  // createCanvas(1000, 1000, WEBGL);
   noStroke();
   frameRate(60);
 
   containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (v2, col) => new Container(row, col)));
-  const compiled = generateShader(containers);
-  print(compiled)
-  geneticShader = createShader(geneticVert, compiled);
+  updateShader();
 
   amplitudeSum = 0;
   amplitudeVals = []
   amplitude = new p5.Amplitude();
+}
+
+function updateShader() {
+  const compiled = generateShader(containers);
+  print(compiled)
+  geneticShader = createShader(geneticVert, compiled);
 }
 
 function draw() {
@@ -112,9 +118,8 @@ function draw() {
 
   shader(geneticShader);
 
-  geneticShader.setUniform('resolution', [width, height]);
-  const time = sin(frameCount * 0.01);
-  geneticShader.setUniform('time', time);
+  // time += 0.01;
+
 
   const amp = amplitude.getLevel() || 0;
 
@@ -124,8 +129,15 @@ function draw() {
     amplitudeSum -= amplitudeVals.splice(0,1)[0];
   }
   const amplitudeMean = amplitudeSum / amplitudeVals.length
-  // print(amplitudeMean);
-  geneticShader.setUniform('musicAmplitude', pow(max(amp - amplitudeMean, 0), 2));
+  const ampToAdd =  pow(max(amp - amplitudeMean, 0), 2);
+
+  time += .01;
+
+  if (frameCount % 10 === 0)
+    print(frameRate())
+  geneticShader.setUniform('resolution', [width, height]);
+  geneticShader.setUniform('time', time);
+  geneticShader.setUniform('musicAmplitude', ampToAdd);
 
   rect(0,0,width, height);
 }
@@ -189,9 +201,6 @@ function showExpHovered() {
     text(container.exp.map(val => typeof(val) === 'number' ? val.toFixed(3) : val), 10, 10);
 }
 
-function renderAll() {
-  containers.forEach(row => row.forEach(container => container.render()));
-}
 
 function getRandomFrom(l, notThis) {
   let choice;
@@ -218,66 +227,7 @@ function genExp(length) {
   return Array.from({length}, genTerm)
 }
 
-function render(exp, canvas) {
-  canvas.background(0);
-  canvas.strokeWeight(0);
-  for(let y = 0; y < canvas.height; y++) {
-    for(let x = 0; x < canvas.width; x++) {
-      const t = (frameCount) / 3;
-      const env = {
-        x: map(x, 0, canvas.width, -1, 1, true),
-        y: map(y, 0, canvas.height, -1, 1, true),
-        distFromMiddle: map(dist(canvas.width / 2, canvas.height / 2, x, y), 0, dist(canvas.width / 2, canvas.height / 2,0,0), 0, 1),
-        // h: canvas.height,
-        // w: canvas.width,
-        t,//: t > 1 ? 2-t : t,
-      };
 
-      const res = evalExp(exp, env).map(val => {
-        if (val > 1) {
-          // print(val)
-        }
-        return constrain(abs(val) * 255, 0, 255)
-      });
-      // print(x,y,map(x, 0, canvas.width, -1, 1, true), map(y, 0, canvas.height, -1, 1, true), res);
-      const resultColor = color(res);
-      canvas.stroke(resultColor);
-      canvas.point(x,y);
-    }
-  }
-}
-
-function safeDivide(a,b) {
-  return b === 0 ? 0 : a / b;
-}
-
-
-function evalExp(exp, env) {
-  const stack = [];
-  const pop = () => {
-    return stack.pop() || 0;
-  }
-  exp.forEach(val => {
-    switch (val) {
-      case '+': stack.push(pop() + pop()); break;
-      case '-': stack.push(pop() - pop()); break;
-      case 'sin': stack.push(sin(pop())); break;
-      case 'cos': stack.push(cos(pop())); break;
-      // case 'cos': stack.push(cos(pop())); break;
-      case '/': stack.push(safeDivide(pop(), pop())); break;
-      case '*': stack.push(pop() * pop()); break;
-      case 'dist': stack.push(dist(pop(), pop(), pop(), pop())); break;
-      case 'dup': const x = pop(); stack.push(x); stack.push(x); break;
-      case 'drop': pop(); break;
-      case 'rotate': stack.length > 0 && stack.push(stack.splice(0,1)[0]); break;
-      case 'exp': stack.push(pow(stack.pop(), stack.pop())); break;
-      case 'atan': stack.push(atan2(pop(), pop())); break;
-      default:
-        stack.push(env[val] != undefined ? env[val] : val);
-    }
-  });
-  return [pop(), pop(), pop()];
-}
 
 function expToString(exp) {
   return exp.join(' ');
@@ -308,6 +258,7 @@ function mergeExps(expDest, expSrc) {
 }
 
 function cull() {
+  print('cull called');
   const toKill = []
   const survivors = []
   containers.forEach(row => row.forEach(container => {
@@ -323,7 +274,7 @@ function cull() {
     // container.render();
   })
   survivors.forEach(container => container.toggleSelection())
-  containers.forEach(row => row.forEach(container => container.render()));
+  updateShader();
 }
 
 
@@ -337,30 +288,8 @@ class Container {
     this.id = containerNum++;
   }
 
-  render() {
-    const x = this.col * width / cols;
-    const y = this.row * height / rows;
-    render(this.exp, this.canvas);
-    image(this.canvas, x, y, width / cols, height / cols);
-
-    if (this.selected) {
-      fill(169, 32, 54, 100);
-      noStroke();
-      rect(x, y, width / cols, height / cols);
-    }
-  }
-
   toggleSelection() {
-    const x = this.col * width / cols;
-    const y = this.row * height / rows;
     this.selected = !this.selected;
-    if (this.selected) {
-      fill(169, 32, 54, 100);
-      noStroke();
-      rect(x, y, width / cols, height / cols);
-    } else {
-      this.render();
-    }
   }
 
 
