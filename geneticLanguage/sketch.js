@@ -1,22 +1,29 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
+let fft;
 
 let rows = 3;
 let cols = 4;
 
-let xResolution = 200;
-let yResolution = 200;
+let xResolution = 400;
+let yResolution = 400;
 
 const programLength = 150;
 const mutateBy = 2;
 
 const useMusic = true;
 const useBackgroundImage = true;
-const useCamera = true;
+const useCamera = false;
 let backgroundImage;
 
+const fftEnergies = 10;
 
 let time = 0;
+
+let geneticShader;
+let music;
+
+let amplitude;
 
 
 const operators = [
@@ -35,6 +42,7 @@ const operators = [
   'getFromBackgroundRed',
   'getFromBackgroundGreen',
   'getFromBackgroundBlue',
+  'getAudioEnergy',
 ];
 const symbols = [
   'x',
@@ -42,15 +50,11 @@ const symbols = [
   'distFromMiddle',
   'time',
   'musicAmplitude',
-  'backgroundImageRed',
-  'backgroundImageGreen',
-  'backgroundImageBlue',
+  // 'backgroundImageRed',
+  // 'backgroundImageGreen',
+  // 'backgroundImageBlue',
+  'backgroundImageDelta'
 ];
-
-let geneticShader;
-let music;
-
-let amplitude, amplitudeVals, amplitudeSum;
 
 
 // DONT CHANGE THIS
@@ -72,6 +76,8 @@ function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
   backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/face3.jpg') : null;
+  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/nebula.jpg') : null;
+
 }
 
 
@@ -85,7 +91,8 @@ function keyPressed(){
   }
   switch (key) {
     case ' ':
-      if (useMusic) music.isPlaying() ? music.pause() : music.play();
+      if (useMusic) music.isPlaying() ? music.pause() : music.play(); break;
+    case 't': time = 0; break;
   }
 }
 
@@ -108,15 +115,19 @@ function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
   createCanvas(displayWidth, displayHeight, WEBGL);
+
   noStroke();
   frameRate(60);
-
+  // randomSeed(0);
+  fft = new p5.FFT();
   containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (v2, col) => new Container(row, col)));
   updateShader();
 
   amplitudeSum = 0;
   amplitudeVals = []
   amplitude = new p5.Amplitude();
+  amplitude.toggleNormalize();
+  amplitude.smooth(.1)
 
   if(useCamera) {
     cam = createCapture(VIDEO);
@@ -136,28 +147,22 @@ function updateShader() {
 function draw() {
   // shader() sets the active shader with our shader
   // fill(0)
-
+  var spectrum = fft.analyze();
   shader(geneticShader);
 
   // time += 0.01;
 
-
   const amp = amplitude.getLevel() || 0;
-
-  amplitudeVals.push(amp);
-  amplitudeSum += amp;
-  if (amplitudeVals.length > 100) {
-    amplitudeSum -= amplitudeVals.splice(0,1)[0];
-  }
-  const amplitudeMean = amplitudeSum / amplitudeVals.length
-  const ampToAdd =  pow(max(amp - amplitudeMean, 0), 2);
-
   time += .01;
+
 
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
-  geneticShader.setUniform('musicAmplitude', ampToAdd);
+  geneticShader.setUniform('musicAmplitude', amp);
   geneticShader.setUniform('backgroundImage', useCamera ? cam : backgroundImage);
+  geneticShader.setUniform('energies', fft.linAverages(fftEnergies));
+  geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
+  // fft.linAverages().forEach((ave, i) => geneticShader.setUniform(`energy_${i}`, ave));
 
   rect(0,0,width, height);
 }
@@ -176,7 +181,11 @@ function generateShader(containers) {
   uniform float time;
   uniform float musicAmplitude;
   uniform sampler2D backgroundImage;
+  uniform float energies[4];
 
+
+  const float dist = 1.0;
+  const vec2 stepSize = 0.001 * vec2(${blockWidth / xResolution}, ${blockHeight / yResolution});
   const vec2 resolution = vec2(${width}.0, ${height}.0);
 
   vec3 rgb(float r, float g, float b){
@@ -196,6 +205,34 @@ function generateShader(containers) {
     return  col * ((height - yPos) * (width - xPos));
   }
 
+  float getEnergy(int i) {
+    for (int k = 0; k < 4; ++k) {
+      if (i == k) {
+        return energies[k];
+      }
+    }
+  }
+
+
+  void make_kernel(inout vec4 n[9], sampler2D tex, vec2 coord)
+    {
+      float w = stepSize.x;
+      float h = stepSize.y;
+
+      n[0] = texture2D(tex, coord + vec2( -w, -h));
+      n[1] = texture2D(tex, coord + vec2(0.0, -h));
+      n[2] = texture2D(tex, coord + vec2(  w, -h));
+      n[3] = texture2D(tex, coord + vec2( -w, 0.0));
+      n[4] = texture2D(tex, coord);
+      n[5] = texture2D(tex, coord + vec2(  w, 0.0));
+      n[6] = texture2D(tex, coord + vec2( -w, h));
+      n[7] = texture2D(tex, coord + vec2(0.0, h));
+      n[8] = texture2D(tex, coord + vec2(  w, h));
+    }
+
+
+
+
   void main() {
     float none = 0.0;
     float x;
@@ -205,6 +242,7 @@ function generateShader(containers) {
     float backgroundImageRed = 0.0;
     float backgroundImageGreen = 0.0;
     float backgroundImageBlue = 0.0;
+    float backgroundImageDelta;
 
 
     x = gl_FragCoord.x;
@@ -223,6 +261,16 @@ function generateShader(containers) {
     backgroundImageRed = backgroundImageVal.r;
     backgroundImageGreen = backgroundImageVal.g;
     backgroundImageBlue = backgroundImageVal.b;
+
+    vec4 n[9];
+    make_kernel(n, backgroundImage, vec2(x,y));
+
+    vec4 sobel_edge_h = n[2] + (2.0*n[5]) + n[8] - (n[0] + (2.0*n[3]) + n[6]);
+    vec4 sobel_edge_v = n[0] + (2.0*n[1]) + n[2] - (n[6] + (2.0*n[7]) + n[8]);
+    vec4 sobel = sqrt((sobel_edge_h * sobel_edge_h) + (sobel_edge_v * sobel_edge_v));
+
+
+    backgroundImageDelta = length(sobel.rgb);
 
 
     float width = resolution.x / ${cols}.0;
@@ -374,7 +422,7 @@ class Container {
         case 'getFromBackgroundRed': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).r`); break;
         case 'getFromBackgroundBlue': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).g`); break;
         case 'getFromBackgroundGreen': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).b`); break;
-
+        case 'getAudioEnergy': push(`getEnergy(int(clamp(${pop()}, 0.0, 0.999999)))`); break;
         default:
           // push(env[val] != undefined ? env[val] : val);
           push(val)
