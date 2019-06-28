@@ -5,10 +5,10 @@ let fft;
 let rows = 3;
 let cols = 4;
 
-let xResolution = 400;
-let yResolution = 400;
+let xResolution = 1000;
+let yResolution = 1000;
 
-const programLength = 150;
+const programLength = 50;
 const mutateBy = 2;
 
 const useMusic = true;
@@ -42,18 +42,20 @@ const operators = [
   'getFromBackgroundRed',
   'getFromBackgroundGreen',
   'getFromBackgroundBlue',
+  'mod',
   'getAudioEnergy',
 ];
 const symbols = [
   'x',
   'y',
   'distFromMiddle',
-  'time',
+  // 'time',
   'musicAmplitude',
+  'musicCentroid',
   // 'backgroundImageRed',
   // 'backgroundImageGreen',
   // 'backgroundImageBlue',
-  'backgroundImageDelta'
+  // 'backgroundImageDelta'
 ];
 
 
@@ -75,8 +77,8 @@ void main() {
 function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
-  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/face3.jpg') : null;
-  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/nebula.jpg') : null;
+  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/face3.jpg') : null;
+  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
 
 }
 
@@ -120,6 +122,7 @@ function setup() {
   frameRate(60);
   // randomSeed(0);
   fft = new p5.FFT();
+  fft.smooth();
   containers = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (v2, col) => new Container(row, col)));
   updateShader();
 
@@ -136,6 +139,8 @@ function setup() {
     // hide the html element that createCapture adds to the screen
     cam.hide();
   }
+
+  backgroundImage.resize(width / cols, height / rows);
 }
 
 function updateShader() {
@@ -147,13 +152,17 @@ function updateShader() {
 function draw() {
   // shader() sets the active shader with our shader
   // fill(0)
-  var spectrum = fft.analyze();
+  let spectrum = fft.analyze();
   shader(geneticShader);
 
   // time += 0.01;
 
   const amp = amplitude.getLevel() || 0;
   time += .01;
+
+  let nyquist = 22050;
+  spectralCentroid = fft.getCentroid();
+  let mean_freq_index = spectralCentroid/(nyquist/spectrum.length);
 
 
   geneticShader.setUniform('resolution', [width, height]);
@@ -162,7 +171,7 @@ function draw() {
   geneticShader.setUniform('backgroundImage', useCamera ? cam : backgroundImage);
   geneticShader.setUniform('energies', fft.linAverages(fftEnergies));
   geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
-  // fft.linAverages().forEach((ave, i) => geneticShader.setUniform(`energy_${i}`, ave));
+  geneticShader.setUniform('musicCentroid', map(log(mean_freq_index), 0, log(spectrum.length), 0, 1));
 
   rect(0,0,width, height);
 }
@@ -182,6 +191,7 @@ function generateShader(containers) {
   uniform float musicAmplitude;
   uniform sampler2D backgroundImage;
   uniform float energies[4];
+  uniform float musicCentroid;
 
 
   const float dist = 1.0;
@@ -242,7 +252,7 @@ function generateShader(containers) {
     float backgroundImageRed = 0.0;
     float backgroundImageGreen = 0.0;
     float backgroundImageBlue = 0.0;
-    float backgroundImageDelta;
+    float backgroundImageDelta = 0.0;
 
 
     x = gl_FragCoord.x;
@@ -257,20 +267,20 @@ function generateShader(containers) {
     y /= ${(blockHeight).toFixed(10)};
     y = 1.0 - y;
     distFromMiddle = pow(x - 0.5, 2.0) + pow(y - 0.5, 2.0);
-    backgroundImageVal = texture2D(backgroundImage, vec2(x, y));
+    backgroundImageVal = texture2D(backgroundImage, vec2(mod(x, 1.0), mod(y, 1.0)));
     backgroundImageRed = backgroundImageVal.r;
     backgroundImageGreen = backgroundImageVal.g;
     backgroundImageBlue = backgroundImageVal.b;
 
     vec4 n[9];
-    make_kernel(n, backgroundImage, vec2(x,y));
+    // make_kernel(n, backgroundImage, vec2(x,y));
 
-    vec4 sobel_edge_h = n[2] + (2.0*n[5]) + n[8] - (n[0] + (2.0*n[3]) + n[6]);
-    vec4 sobel_edge_v = n[0] + (2.0*n[1]) + n[2] - (n[6] + (2.0*n[7]) + n[8]);
-    vec4 sobel = sqrt((sobel_edge_h * sobel_edge_h) + (sobel_edge_v * sobel_edge_v));
+    // vec4 sobel_edge_h = n[2] + (2.0*n[5]) + n[8] - (n[0] + (2.0*n[3]) + n[6]);
+    // vec4 sobel_edge_v = n[0] + (2.0*n[1]) + n[2] - (n[6] + (2.0*n[7]) + n[8]);
+    // vec4 sobel = sqrt((sobel_edge_h * sobel_edge_h) + (sobel_edge_v * sobel_edge_v));
 
 
-    backgroundImageDelta = length(sobel.rgb);
+    // backgroundImageDelta = length(sobel.rgb);
 
 
     float width = resolution.x / ${cols}.0;
@@ -423,6 +433,7 @@ class Container {
         case 'getFromBackgroundBlue': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).g`); break;
         case 'getFromBackgroundGreen': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).b`); break;
         case 'getAudioEnergy': push(`getEnergy(int(clamp(${pop()}, 0.0, 0.999999)))`); break;
+        case 'mod': push(`mod(${pop()}, ${pop()})`); break;
         default:
           // push(env[val] != undefined ? env[val] : val);
           push(val)
