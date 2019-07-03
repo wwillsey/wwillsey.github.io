@@ -1,12 +1,13 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
 let fft;
+let gui;
 
 let rows = 3;
 let cols = 4;
 
-let xResolution = 1000;
-let yResolution = 1000;
+let xResolution = 100;
+let yResolution = 100;
 
 const programLength = 50;
 const mutateBy = 2;
@@ -49,13 +50,13 @@ const symbols = [
   'x',
   'y',
   'distFromMiddle',
-  // 'time',
+  'time',
   'musicAmplitude',
   'musicCentroid',
-  // 'backgroundImageRed',
-  // 'backgroundImageGreen',
-  // 'backgroundImageBlue',
-  // 'backgroundImageDelta'
+  'backgroundImageRed',
+  'backgroundImageGreen',
+  'backgroundImageBlue',
+  'backgroundImageDelta'
 ];
 
 
@@ -117,7 +118,7 @@ function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
   createCanvas(displayWidth, displayHeight, WEBGL);
-
+  gui = new GUI(operators, symbols);
   noStroke();
   frameRate(60);
   // randomSeed(0);
@@ -141,6 +142,14 @@ function setup() {
   }
 
   backgroundImage.resize(width / cols, height / rows);
+}
+
+function updateContainerExps() {
+  print('updating container exps!')
+  containers.forEach(row => row.forEach(container => {
+    container.exp = genExp(programLength, container.seed);
+  }));
+  updateShader();
 }
 
 function updateShader() {
@@ -267,20 +276,21 @@ function generateShader(containers) {
     y /= ${(blockHeight).toFixed(10)};
     y = 1.0 - y;
     distFromMiddle = pow(x - 0.5, 2.0) + pow(y - 0.5, 2.0);
-    backgroundImageVal = texture2D(backgroundImage, vec2(mod(x, 1.0), mod(y, 1.0)));
-    backgroundImageRed = backgroundImageVal.r;
-    backgroundImageGreen = backgroundImageVal.g;
-    backgroundImageBlue = backgroundImageVal.b;
 
-    vec4 n[9];
-    // make_kernel(n, backgroundImage, vec2(x,y));
+    ${gui['backgroundImageRed'] || gui['backgroundImageGreen'] || gui['backgroundImageBlue'] ?
+      `backgroundImageVal = texture2D(backgroundImage, vec2(mod(x, 1.0), mod(y, 1.0)));` : ''}
+    ${gui['backgroundImageRed'] ? `backgroundImageRed = backgroundImageVal.r;` : ''}
+    ${gui['backgroundImageGreen'] ? `backgroundImageGreen = backgroundImageVal.g;` : ''}
+    ${gui['backgroundImageBlue'] ? `backgroundImageBlue = backgroundImageVal.b;` : ''}
 
-    // vec4 sobel_edge_h = n[2] + (2.0*n[5]) + n[8] - (n[0] + (2.0*n[3]) + n[6]);
-    // vec4 sobel_edge_v = n[0] + (2.0*n[1]) + n[2] - (n[6] + (2.0*n[7]) + n[8]);
-    // vec4 sobel = sqrt((sobel_edge_h * sobel_edge_h) + (sobel_edge_v * sobel_edge_v));
-
-
-    // backgroundImageDelta = length(sobel.rgb);
+    ${gui['backgroundImageDelta'] ? `
+      vec4 n[9];
+      make_kernel(n, backgroundImage, vec2(x,y));
+      vec4 sobel_edge_h = n[2] + (2.0*n[5]) + n[8] - (n[0] + (2.0*n[3]) + n[6]);
+      vec4 sobel_edge_v = n[0] + (2.0*n[1]) + n[2] - (n[6] + (2.0*n[7]) + n[8]);
+      vec4 sobel = sqrt((sobel_edge_h * sobel_edge_h) + (sobel_edge_v * sobel_edge_v));
+      backgroundImageDelta = length(sobel.rgb);
+      ` : ''}
 
 
     float width = resolution.x / ${cols}.0;
@@ -307,9 +317,11 @@ function showExpHovered() {
 
 
 function getRandomFrom(l, notThis) {
+  const enabled = l.filter(item => gui[item]);
+  print(enabled)
   let choice;
   do {
-    choice = random(l);
+    choice = random(enabled);
   } while (notThis != undefined && choice === notThis)
   return choice;
 }
@@ -327,7 +339,8 @@ function genTerm() {
   return getRandomFrom(operators)
 }
 
-function genExp(length) {
+function genExp(length, seed) {
+  randomSeed(seed);
   return Array.from({length}, genTerm)
 }
 
@@ -386,7 +399,8 @@ let containerNum = 0;
 class Container {
   constructor(row, col) {
     this.selected = false;
-    this.exp = genExp(programLength);
+    this.seed = random(Date.now());
+    this.exp = genExp(programLength, this.seed);
     this.row = row;
     this.col = col;
     this.id = containerNum++;
@@ -450,5 +464,27 @@ class Container {
     r = rect(${(this.col * width / cols*2).toFixed(10)}, ${(this.row * height / rows * 2 - height).toFixed(10)}, ${(width / cols * 2).toFixed(10)}, ${(height / rows * 2).toFixed(10)}, col);
     scene = mix(scene, r, r);
     `;
+  }
+}
+
+
+class GUI {
+  constructor(operators, symbols) {
+    this.gui = new dat.GUI({width: 500});
+
+    const operatorFolder = this.gui.addFolder('Operators');
+    const symbolFolder = this.gui.addFolder('Symbols');
+
+    operators.forEach(op => {
+      this[op] = true;
+      const controller = operatorFolder.add(this, op);
+      controller.onFinishChange(updateContainerExps);
+    });
+
+    symbols.forEach(symbol => {
+      this[symbol] = true;
+      const controller = symbolFolder.add(this, symbol);
+      controller.onFinishChange(updateContainerExps);
+    });
   }
 }
