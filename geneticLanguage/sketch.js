@@ -6,8 +6,8 @@ let gui;
 let rows = 3;
 let cols = 4;
 
-let xResolution = 100;
-let yResolution = 100;
+let xResolution = 1000;
+let yResolution = 1000;
 
 const programLength = 50;
 const mutateBy = 2;
@@ -77,9 +77,9 @@ void main() {
 
 function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
-  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
+  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/face3.jpg') : null;
-  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
+  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
 
 }
 
