@@ -4,14 +4,14 @@ const slimes = [];
 let canvas;
 let drawCanvas;
 const startSlimes = 1000;
-const maxSlimes = 100000;
+const maxSlimes = 5000;
 const friction = .007;
 
 const boxLengthMult = .013;
 const boxSizeMult = .009;
 
 const decayFrequency = 17;
-const decayAmount = 30;
+const decayAmount = 3;
 
 const blurFrequency = 171;
 
@@ -21,6 +21,8 @@ let saveFrameNum = 1;
 
 let useBackgroundImg = false;
 let backgroundImg;
+
+const sumMapScale = 5;
 
 
 const pourPts = [];
@@ -46,7 +48,7 @@ function keyPressed() {
 }
 
 function setup() {
-  canvas = createCanvas(1920/3, 1080/3);
+  canvas = createCanvas(1920/5, 1080/5);
   backgroundImg.resize(width, height);
   // slowColor = color(202, 122, 181);
   // fastColor = color(122, 202, 143);
@@ -114,7 +116,8 @@ function createSlime(x,y, color, vel) {
 function draw() {
   // for (let i = 0; i < 1; i++)
   //   slimes.push(createSlime(width/2, height/2, color('black')));
-  pourPts.forEach((pt) => slimes.push(createSlime(pt.x, pt.y, null, .12)));
+  if (slimes.length < maxSlimes)
+    pourPts.forEach((pt) => slimes.push(createSlime(pt.x, pt.y, null, .12)));
 
   if (slimes.length > maxSlimes)
     slimes.splice(0,1)
@@ -163,8 +166,8 @@ class Slime {
     const sensorAngle = this.options.sensorAngle//, this.options.sensorAngle * .0000005);
     const sensorLength = constrain(randomGaussian(this.options.sensorLength, this.options.sensorLength), this.options.sensorLength * .05, this.options.sensorLength * 10);
     const sensorBoxSize = this.options.sensorBoxSize / 2;
-    const worldW = this.world.options.w;
-    const worldH = this.world.options.h;
+    const worldW = round(this.world.options.w / sumMapScale);
+    const worldH = round(this.world.options.h / sumMapScale);
 
     const offset = (sensorAttempts - 1) / 2;
     const sensed = shuffle(Array.from({ length: sensorAttempts }, (v, i) => {
@@ -172,10 +175,10 @@ class Slime {
       const x = this.state.x + cos(angle) * sensorLength;
       const y = this.state.y + sin(angle) * sensorLength;
 
-      const xTop = constrain(round(x + sensorBoxSize), 0, worldW - 1);
-      const yTop = constrain(round(y + sensorBoxSize), 0, worldH - 1);
-      const xBottom = constrain(round(x - sensorBoxSize), 0, worldW - 1);
-      const yBottom = constrain(round(y - sensorBoxSize), 0, worldH - 1);
+      const xTop = constrain(round((x + sensorBoxSize) / sumMapScale), 0, worldW - 1);
+      const yTop = constrain(round((y + sensorBoxSize) / sumMapScale), 0, worldH - 1);
+      const xBottom = constrain(round((x - sensorBoxSize) / sumMapScale), 0, worldW - 1);
+      const yBottom = constrain(round((y - sensorBoxSize) / sumMapScale), 0, worldH - 1);
 
       const top = safeGet(xTop, yTop, worldW, worldH, this.world.sumMap, 0);
       const bottom = safeGet(xTop, yBottom - 1, worldW, worldH, this.world.sumMap, 0);
@@ -270,7 +273,8 @@ class World {
     this.options = options;
     // this.map = Array.from({ length: this.options.w }, () => Array.from({ length: this.options.h }, () => 0));
     this.map = canvas;
-    this.sumMap = Array.from({ length: this.options.w }, () => Array.from({ length: this.options.h }, () => 0));
+    this.sumMap = Array.from({ length: round(this.options.w / sumMapScale) }, () => Array.from({ length: round(this.options.h / sumMapScale) }, () => 0));
+    this.sumMapGraphic = createGraphics(round(this.options.w / sumMapScale), round(this.options.h / sumMapScale));
   }
 
   render() {
@@ -286,9 +290,9 @@ class World {
 
 
   createSumMap() {
-    // const start = Date.now();
-    this.createSumMap2();
-    // print(`SumMap took: ${Date.now() - start} ms`)
+    const start = Date.now();
+    this.createSumMap3();
+    print(`SumMap took: ${Date.now() - start} ms`)
     // return map;
   }
 
@@ -336,6 +340,32 @@ class World {
     return sumMap;
   }
 
+  createSumMap3() {
+    loadPixels();
+    this.sumMapGraphic.image(canvas, 0, 0, this.sumMap.width, this.sumMap.height);
+    this.sumMapGraphic.loadPixels();
+
+    const w = round(this.options.w / sumMapScale);
+    const h = round(this.options.h / sumMapScale);
+    const sumMap = this.sumMap;
+    for (let x = 0; x < w; x++) {
+      let lastVal = 0;
+      for (let y = 0; y < h; y ++) {
+        // const col = this.sumMapGraphic.get(x,y);
+        lastVal += getFromPixelsWith(x,y, this.sumMapGraphic);
+        sumMap[x][y] = lastVal;
+      }
+    }
+
+    for (let y = 0; y < h; y++) {
+      let lastVal = sumMap[0][y];
+      for (let x = 1; x < w; x ++) {
+        lastVal = sumMap[x][y] += lastVal;
+      }
+    }
+    return sumMap;
+  }
+
 
 
 
@@ -369,7 +399,7 @@ class World {
     // const temp = Array.from({ length: this.options.w }, () => Array.from({ length: this.options.h }, () => 0));
     // this.BlurHorizontal(this.map, temp, radius);
     // this.BlurVertical(temp, this.map, radius);
-    filter('BLUR', radius);
+    // filter('BLUR', radius);
   }
 
   decay(amount) {
@@ -427,4 +457,15 @@ function getFromPixels(x, y) {
   const d = 1
   index = 4 * ((y * pd + d) * width * pd + (x * pd + d));
   return (pixels[index] + pixels[index + 1] + pixels[index + 2]) / (255 * 3);
+}
+
+function getFromPixelsWith(x, y, g) {
+  if (x >= g.width || y >= g.height || x < 0 || y < 0)
+    return 0;
+  // const c = get(x,y);
+  // return (red(c) + green(c) + blue(c)) / (255 * 3);
+  const pd = g.pixelDensity()
+  const d = 1
+  index = 4 * ((y * pd + d) * g.width * pd + (x * pd + d));
+  return (g.pixels[index] + g.pixels[index + 1] + g.pixels[index + 2]) / (255 * 3);
 }
