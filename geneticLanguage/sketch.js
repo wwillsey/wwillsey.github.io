@@ -6,8 +6,8 @@ let gui;
 let rows = 4;
 let cols = 5;
 
-let xResolution = 1200;
-let yResolution = 1200;
+let xResolution = 2200;
+let yResolution = 2200;
 
 const programLength = 50;
 const mutateBy = 2;
@@ -126,7 +126,7 @@ function setup() {
   createCanvas(displayWidth-500, displayHeight, WEBGL);
   shaderLayer = createGraphics(width, height, WEBGL);
   if (useBackgroundVideo) {
-    backgroundVideo = createVideo('http://localhost:3000/geneticLanguage/videos/dark_valley.mp4');
+    backgroundVideo = createVideo('http://localhost:3000/geneticLanguage/videos/archimedes.mp4');
     backgroundVideo.loop();
     backgroundVideo.hide();
   }
@@ -194,7 +194,13 @@ function draw() {
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
   geneticShader.setUniform('musicAmplitude', amp);
-  geneticShader.setUniform('backgroundImage', backgroundVideo);//useCamera ? cam : backgroundImage);
+  if (backgroundVideo)
+    geneticShader.setUniform('backgroundImage', backgroundVideo);
+  else if (cam)
+    geneticShader.setUniform('backgroundImage', cam);
+  else if (backgroundImage)
+    geneticShader.setUniform('backgroundImage', backgroundImage);
+
   geneticShader.setUniform('energies', fft.linAverages(fftEnergies));
   geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
   geneticShader.setUniform('musicCentroid', map(log(mean_freq_index), 0, log(spectrum.length), 0, 1));
