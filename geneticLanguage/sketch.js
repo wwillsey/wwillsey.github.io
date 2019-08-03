@@ -89,16 +89,21 @@ function keyPressed(){
   switch (keyCode) {
     case ENTER:
       cull();
-      time = 0;
+      // time = 0;
       // redraw();
+    case SHIFT:
+      maximize();
   }
   switch (key) {
     case ' ':
-      if (useMusic) music.isPlaying() ? music.pause() : music.play(); break;
+      toggleMusic(); break;
     case 't': time = 0; break;
   }
 }
 
+function toggleMusic() {
+  if (useMusic) music.isPlaying() ? music.pause() : music.play();
+}
 
 function selectAtMouse() {
   const col = floor(mouseX / width * cols);
@@ -486,5 +491,21 @@ class GUI {
       const controller = symbolFolder.add(this, symbol);
       controller.onFinishChange(updateContainerExps);
     });
+
+    this.gui.add(this, 'resetTime');
+    this.gui.add(this, 'cull');
+    this.gui.add(this, 'toggleMusic');
+  }
+
+  resetTime() {
+    time = 0;
+  }
+
+  cull() {
+    cull();
+  }
+
+  toggleMusic() {
+    toggleMusic();
   }
 }
