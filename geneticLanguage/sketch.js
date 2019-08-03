@@ -169,7 +169,7 @@ function updateContainerExps() {
 function updateShader() {
   const containersForGen = isMaximized ? [[maximizeState.container]] : containers;
   const compiled = generateShader(containersForGen);
-  print(compiled)
+  print(compiled.split('\n').map((v,i) => `${i+1}:  ${v}`).join('\n'))
   geneticShader = shaderLayer.createShader(geneticVert, compiled);
 }
 
@@ -479,13 +479,16 @@ class Container {
 
 
     return `
-    ${Array.from({length: maxi}, (v, i) => `float x_${this.id}_${i}`).join(';\n')};
-    ${result}
+    r = rect(${(this.col * width / cols*2).toFixed(10)}, ${(this.row * height / rows * 2 - height).toFixed(10)}, ${(width / cols * 2).toFixed(10)}, ${(height / rows * 2).toFixed(10)}, vec3(1.0, 1.0, 1.0));
+    if(r != vec3(0.0, 0.0, 0.0)) {
+      ${Array.from({length: maxi}, (v, i) => `float x_${this.id}_${i}`).join(';\n')};
+      ${result}
 
-    col = vec3(${pop()} * 255.0, ${pop()} * 255.0, ${pop()} * 255.0);
-    // col = vec3(x, y, 0.0);
-    r = rect(${(this.col * width / cols*2).toFixed(10)}, ${(this.row * height / rows * 2 - height).toFixed(10)}, ${(width / cols * 2).toFixed(10)}, ${(height / rows * 2).toFixed(10)}, col);
-    scene = mix(scene, r, r);
+      col = vec3(${pop()} * 255.0, ${pop()} * 255.0, ${pop()} * 255.0) * r;
+
+      // col = vec3(x, y, 0.0);
+      scene = mix(scene, col, col);
+    }
     `;
   }
 }
