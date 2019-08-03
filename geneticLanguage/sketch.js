@@ -3,17 +3,18 @@ let containers;
 let fft;
 let gui;
 
-let rows = 3;
-let cols = 4;
+let rows = 4;
+let cols = 5;
 
-let xResolution = 1000;
-let yResolution = 1000;
+let xResolution = 1200;
+let yResolution = 1200;
 
 const programLength = 50;
 const mutateBy = 2;
 
 const useMusic = true;
 const useBackgroundImage = true;
+const useBackgroundVideo = true;
 const useCamera = false;
 let backgroundImage;
 
@@ -26,6 +27,8 @@ let music;
 
 let amplitude;
 
+let maximizeState = {};
+let isMaximized = false;
 
 const operators = [
   '+',
@@ -77,8 +80,8 @@ void main() {
 
 function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
-  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
-  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/face3.jpg') : null;
+  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
+  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/nebula.jpg') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
 
 }
@@ -91,8 +94,6 @@ function keyPressed(){
       cull();
       // time = 0;
       // redraw();
-    case SHIFT:
-      maximize();
   }
   switch (key) {
     case ' ':
@@ -122,7 +123,15 @@ function mousePressed() {
 function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(displayWidth, displayHeight, WEBGL);
+  createCanvas(displayWidth-500, displayHeight, WEBGL);
+  shaderLayer = createGraphics(width, height, WEBGL);
+  if (useBackgroundVideo) {
+    backgroundVideo = createVideo('http://localhost:3000/geneticLanguage/videos/dark_valley.mp4');
+    backgroundVideo.loop();
+    backgroundVideo.hide();
+  }
+
+
   gui = new GUI(operators, symbols);
   noStroke();
   frameRate(60);
@@ -146,7 +155,7 @@ function setup() {
     cam.hide();
   }
 
-  backgroundImage.resize(width / cols, height / rows);
+  // backgroundImage.resize(width / cols, height / rows);
 }
 
 function updateContainerExps() {
@@ -158,16 +167,19 @@ function updateContainerExps() {
 }
 
 function updateShader() {
-  const compiled = generateShader(containers);
+  const containersForGen = isMaximized ? [[maximizeState.container]] : containers;
+  const compiled = generateShader(containersForGen);
   print(compiled)
-  geneticShader = createShader(geneticVert, compiled);
+  geneticShader = shaderLayer.createShader(geneticVert, compiled);
 }
 
 function draw() {
+  background(0)
+  // orbitControl();
   // shader() sets the active shader with our shader
   // fill(0)
   let spectrum = fft.analyze();
-  shader(geneticShader);
+  shaderLayer.shader(geneticShader);
 
   // time += 0.01;
 
@@ -182,12 +194,18 @@ function draw() {
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
   geneticShader.setUniform('musicAmplitude', amp);
-  geneticShader.setUniform('backgroundImage', useCamera ? cam : backgroundImage);
+  geneticShader.setUniform('backgroundImage', backgroundVideo);//useCamera ? cam : backgroundImage);
   geneticShader.setUniform('energies', fft.linAverages(fftEnergies));
   geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
   geneticShader.setUniform('musicCentroid', map(log(mean_freq_index), 0, log(spectrum.length), 0, 1));
 
-  rect(0,0,width, height);
+  shaderLayer.rect(0,0,width, height);
+  // shaderLayer.loadPixels();
+  image(shaderLayer, -width/2, -height/2);
+  // texture(shaderLayer)
+  // sphere(1000)
+  // fill(255);
+  // text(frameRate(), 10,10);
 }
 
 
@@ -209,7 +227,7 @@ function generateShader(containers) {
 
 
   const float dist = 1.0;
-  const vec2 stepSize = 0.001 * vec2(${blockWidth / xResolution}, ${blockHeight / yResolution});
+  const vec2 stepSize = 0.0005 * vec2(${blockWidth / xResolution}, ${blockHeight / yResolution});
   const vec2 resolution = vec2(${width}.0, ${height}.0);
 
   vec3 rgb(float r, float g, float b){
@@ -473,29 +491,35 @@ class Container {
 }
 
 
+
 class GUI {
   constructor(operators, symbols) {
-    this.gui = new dat.GUI({width: 500});
+    this.gui = new dat.GUI({width: 200});
 
     const operatorFolder = this.gui.addFolder('Operators');
     const symbolFolder = this.gui.addFolder('Symbols');
 
-    operators.forEach(op => {
+    const addRadio = (op, folder) => {
       this[op] = true;
-      const controller = operatorFolder.add(this, op);
+      const controller = folder.add(this, op);
       controller.onFinishChange(updateContainerExps);
-    });
+      controller.domElement.parentNode.children[0].setAttribute("style", "float:left; width:90%")
+      controller.domElement.setAttribute("style", "float:right; width:10%")
+    }
 
-    symbols.forEach(symbol => {
-      this[symbol] = true;
-      const controller = symbolFolder.add(this, symbol);
-      controller.onFinishChange(updateContainerExps);
-    });
+    const addButton = (name) => {
+      this.gui.add(this, name).domElement.parentNode.children[0].setAttribute("style", "width:100%")
+    }
 
-    this.gui.add(this, 'resetTime');
-    this.gui.add(this, 'cull');
-    this.gui.add(this, 'toggleMusic');
+    operators.forEach(op => addRadio(op, operatorFolder));
+    symbols.forEach(op => addRadio(op, symbolFolder));
+
+    addButton('resetTime')
+    addButton('cull');
+    addButton('toggleMusic');
+    addButton('toggleMaximize');
   }
+
 
   resetTime() {
     time = 0;
@@ -507,5 +531,43 @@ class GUI {
 
   toggleMusic() {
     toggleMusic();
+  }
+
+  toggleMaximize() {
+    const selected = [];
+
+    containers.forEach(row => row.forEach(container => {
+      if(container.selected)
+        selected.push(container);
+    }));
+
+    let needUpdate = false;
+    if (!isMaximized && selected.length === 1) {
+      maximizeState.container = selected[0];
+      print('maximizing ', maximizeState.container);
+      maximizeState.rows = rows;
+      maximizeState.cols = cols;
+      maximizeState.row = maximizeState.container.row;
+      maximizeState.col = maximizeState.container.col;
+      maximizeState.container.row = 0;
+      maximizeState.container.col = 0;
+      rows = 1;
+      cols = 1;
+      needUpdate = true;
+    } else if (isMaximized) {
+      maximizeState.container.row = maximizeState.row;
+      maximizeState.container.col = maximizeState.col;
+      rows = maximizeState.rows;
+      cols = maximizeState.cols;
+      needUpdate = true;
+    }
+
+    print(maximizeState);
+
+    selected.forEach(container => container.toggleSelection());
+    if (needUpdate) {
+      isMaximized = ! isMaximized;
+      updateShader();
+    }
   }
 }
