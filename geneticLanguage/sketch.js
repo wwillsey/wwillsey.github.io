@@ -3,8 +3,8 @@ let containers;
 let fft;
 let gui;
 
-let rows = 4;
-let cols = 5;
+let rows = 6;
+let cols = 8;
 
 let xResolution = 2200;
 let yResolution = 2200;
@@ -14,9 +14,11 @@ const mutateBy = 2;
 
 const useMusic = true;
 const useBackgroundImage = true;
-const useBackgroundVideo = true;
+const useBackgroundVideo = false;
 const useCamera = false;
 let backgroundImage;
+let backgroundVideo;
+let cam;
 
 const fftEnergies = 10;
 
@@ -24,7 +26,6 @@ let time = 0;
 
 let geneticShader;
 let music;
-
 let amplitude;
 
 let maximizeState = {};
@@ -81,7 +82,7 @@ void main() {
 function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
-  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/nebula.jpg') : null;
+  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/starry.jpg') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
 
 }
@@ -123,7 +124,7 @@ function mousePressed() {
 function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(displayWidth-500, displayHeight, WEBGL);
+  createCanvas(displayWidth-200, displayHeight, WEBGL);
   shaderLayer = createGraphics(width, height, WEBGL);
   if (useBackgroundVideo) {
     backgroundVideo = createVideo('http://localhost:3000/geneticLanguage/videos/archimedes.mp4');
@@ -206,12 +207,18 @@ function draw() {
   geneticShader.setUniform('musicCentroid', map(log(mean_freq_index), 0, log(spectrum.length), 0, 1));
 
   shaderLayer.rect(0,0,width, height);
+  push();
+  translate(-width/2, -height/2);
   // shaderLayer.loadPixels();
-  image(shaderLayer, -width/2, -height/2);
+  image(shaderLayer, 0, 0);
   // texture(shaderLayer)
   // sphere(1000)
-  // fill(255);
-  // text(frameRate(), 10,10);
+  fill(255);
+  textSize(25)
+  text(frameRate(), 10, 10);
+
+  getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
+  pop();
 }
 
 
@@ -347,7 +354,7 @@ function showExpHovered() {
 
 function getRandomFrom(l, notThis) {
   const enabled = l.filter(item => gui[item]);
-  print(enabled)
+  // print(enabled)
   let choice;
   do {
     choice = random(enabled);
@@ -403,6 +410,17 @@ function mergeExps(expDest, expSrc) {
   return res;
 }
 
+
+function getSelectedContainers() {
+  const selected = [];
+
+  containers.forEach(row => row.forEach(container => {
+    if(container.selected)
+      selected.push(container);
+  }));
+  return selected;
+}
+
 function cull() {
   print('cull called');
   const toKill = []
@@ -439,6 +457,14 @@ class Container {
     this.selected = !this.selected;
   }
 
+  renderSelectionHighlighting() {
+    push();
+    fill(0,60);
+    strokeWeight(5);
+    stroke(color('white'));
+    rect(this.col * width / cols, this.row * height / rows, width / cols, height / rows);
+    pop();
+  }
 
   compileExp() {
     let result = ''
@@ -543,17 +569,12 @@ class GUI {
   }
 
   toggleMaximize() {
-    const selected = [];
-
-    containers.forEach(row => row.forEach(container => {
-      if(container.selected)
-        selected.push(container);
-    }));
+    const selected = getSelectedContainers();
 
     let needUpdate = false;
     if (!isMaximized && selected.length === 1) {
       maximizeState.container = selected[0];
-      print('maximizing ', maximizeState.container);
+      // print('maximizing ', maximizeState.container);
       maximizeState.rows = rows;
       maximizeState.cols = cols;
       maximizeState.row = maximizeState.container.row;
@@ -571,7 +592,7 @@ class GUI {
       needUpdate = true;
     }
 
-    print(maximizeState);
+    // print(maximizeState);
 
     selected.forEach(container => container.toggleSelection());
     if (needUpdate) {
