@@ -7,8 +7,8 @@ module.exports = {
         }
     },
     "plugins": [
-        "react",
-        "jsx-a11y",
+        // "react",
+        // "jsx-a11y",
         "import",
         "mocha"
     ],
