@@ -58,7 +58,7 @@ void main() {
   vec3 color = texture2D(colorMap, uv).rgb;
 	vec3 shadeCol = texture2D(shadeMap, uv).rgb;
   float shade = length(color - shadeCol);
-  float n = pow(rand(uv / 123.123123 / time), .7) * 1.5;
+  float n = pow(rand(uv * 123.123123), .2) * 1.5;
   float threshold = 1.5 - n + 0.0 * pow(rand(2.4 * uv ), 10.);
   vec3 dotColor = step(shade, threshold) * mix(shadeCol, color, .2);
 

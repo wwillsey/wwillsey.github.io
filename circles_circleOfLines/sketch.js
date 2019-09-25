@@ -27,17 +27,18 @@ function setup() {
   // fill(color('red'));
   // const i = interceptCircleLineSeg(c, l);
   // print(i)
-  strokeWeight(.005)
+  strokeWeight(1)
 
   c = new Circle(dataLayer, {
     radius: 200,
-    pos: createVector(width / 2, height / 2)
+    pos: createVector(width / 2, height / 2),
+    numPts: 200,
   });
 }
 
 function draw() {
-  // background(255, 1)
-  c.render(200)
+  background(255)
+  c.render(50)
   // image(dataLayer,0 ,0);
 }
 
@@ -54,6 +55,10 @@ class Circle {
 
   getRandomPtInCircle() {
     return createVector(random(this.opts.radius), 0).rotate(random(TWO_PI)).add(this.opts.pos);
+  }
+
+  getPointAtAngle(ang) {
+    return createVector(this.opts.radius, 0).rotate(ang).add(this.opts.pos);
   }
 
 
@@ -83,20 +88,34 @@ class Circle {
     return interceptCircleLineSeg(c, l);
   }
 
+  // generateConnections(n) {
+  //   const graph = [];
+
+  //   while(n) {
+  //     const {pt, data} = this.getRandomDataPt();
+  //     const val = (red(data) + green(data) + blue(data)) / (255 * 3);
+
+  //     stroke(data);
+  //     if (randomGaussian(val, .05) > .9 || randomGaussian(val, .05) < .1) {
+  //       graph.push(this.getIntersections(pt))
+  //       n--;
+  //     }
+  //   }
+  //   return graph;
+  // }
+
   generateConnections(n) {
-    const graph = [];
-
-    while(n) {
-      const {pt, data} = this.getRandomDataPt();
-      const val = (red(data) + green(data) + blue(data)) / (255 * 3);
-
-      stroke(data);
-      if (randomGaussian(val, .05) > .9 || randomGaussian(val, .05) < .1) {
-        graph.push(this.getIntersections(pt))
-        n--;
-      }
+    const step = TWO_PI / this.opts.numPts;
+    const start = round(frameCount / 2) * step;
+    const nPts = n;
+    const result = [];
+    for (let i = 0; i < nPts; i++) {
+      const pt1 = this.getPointAtAngle(start + i * step);
+      // print(pt1)
+      const pt2 = this.getPointAtAngle(start + round(i + sin(frameCount / 50) * this.opts.numPts / 2.5 ) * step);
+      result.push([pt1, pt2]);
     }
-    return graph;
+    return result;
   }
 
   render(n) {
@@ -112,6 +131,7 @@ class Circle {
     // }
 
     this.generateConnections(n).forEach(([p1, p2]) => {
+      // print(p1, p2)
       line(p1.x, p1.y, p2.x, p2.y);
     })
   }

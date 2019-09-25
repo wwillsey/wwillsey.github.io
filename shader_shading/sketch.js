@@ -6,6 +6,7 @@ let shadeCanvas;
 let dotShader;
 let shaderLayer;
 let img;
+let video;
 
 let layer = 2;
 
@@ -30,6 +31,9 @@ function setup() {
   shadeCanvas = createGraphics(width, height);
   shaderLayer = createGraphics(width, height, WEBGL);
 
+  video = createVideo('http://localhost:3000/geneticLanguage/videos/archimedes.mp4');
+  video.loop();
+  video.hide();
   // lights()
 }
 
@@ -81,20 +85,25 @@ function applyLights() {
   pointLight(250, 250, 250, locX, locY, 150);
 }
 
+// function renderScene() {
+//   background(0);
+//   for(let offset = -1; offset < 2; offset++) {
+//     push();
+//     rotateX(frameCount / 100)
+//     rotateZ(frameCount / 40)
+//     const d = offset * 100;
+//     translate(d,d,d);
+//     fill(color(200, 73, 128));
+//     // sphere(60)
+//     // texture(img);
+//     box(60)
+//     pop();
+//   }
+// }
+
 function renderScene() {
-  background(0);
-  for(let offset = -1; offset < 2; offset++) {
-    push();
-    rotateX(frameCount / 100)
-    rotateZ(frameCount / 40)
-    const d = offset * 100;
-    translate(d,d,d);
-    fill(color(200, 73, 128));
-    // sphere(60)
-    // texture(img);
-    box(60)
-    pop();
-  }
+  texture(video)
+  rect(-width/2,-height/2,width, height)
 }
 
 
