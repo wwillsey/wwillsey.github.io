@@ -125,3 +125,129 @@ Dw.EasyCam.prototype.apply = function(n) {
   n = n || o.renderer,
   n && (this.camEYE = this.getPosition(this.camEYE), this.camLAT = this.getCenter(this.camLAT), this.camRUP = this.getUpVector(this.camRUP), n._curCamera.camera(this.camEYE[0], this.camEYE[1], this.camEYE[2], this.camLAT[0], this.camLAT[1], this.camLAT[2], this.camRUP[0], this.camRUP[1], this.camRUP[2]))
 };
+
+
+class TinyQueue {
+  constructor(data = [], compare = defaultCompare) {
+      this.data = data;
+      this.length = this.data.length;
+      this.compare = compare;
+
+      if (this.length > 0) {
+          for (let i = (this.length >> 1) - 1; i >= 0; i--) this._down(i);
+      }
+  }
+
+  push(item) {
+      this.data.push(item);
+      this.length++;
+      this._up(this.length - 1);
+  }
+
+  pop() {
+      if (this.length === 0) return undefined;
+
+      const top = this.data[0];
+      const bottom = this.data.pop();
+      this.length--;
+
+      if (this.length > 0) {
+          this.data[0] = bottom;
+          this._down(0);
+      }
+
+      return top;
+  }
+
+  peek() {
+      return this.data[0];
+  }
+
+  _up(pos) {
+      const {data, compare} = this;
+      const item = data[pos];
+
+      while (pos > 0) {
+          const parent = (pos - 1) >> 1;
+          const current = data[parent];
+          if (compare(item, current) >= 0) break;
+          data[pos] = current;
+          pos = parent;
+      }
+
+      data[pos] = item;
+  }
+
+  _down(pos) {
+      const {data, compare} = this;
+      const halfLength = this.length >> 1;
+      const item = data[pos];
+
+      while (pos < halfLength) {
+          let left = (pos << 1) + 1;
+          let best = data[left];
+          const right = left + 1;
+
+          if (right < this.length && compare(data[right], best) < 0) {
+              left = right;
+              best = data[right];
+          }
+          if (compare(best, item) >= 0) break;
+
+          data[pos] = best;
+          pos = left;
+      }
+
+      data[pos] = item;
+  }
+}
+
+function defaultCompare(a, b) {
+  return a < b ? -1 : a > b ? 1 : 0;
+}
+
+
+function minBy(l, key) {
+  if (!l || !l.length) {
+    return undefined;
+  }
+  let mini = l[0];
+  let miniVal = key(l[0]);
+  for (let i = 1; i < l.length; i++) {
+    const newVal = key(l[i]);
+    if (newVal < miniVal) {
+      mini = l[i];
+      miniVal = newVal;
+    }
+  }
+  return mini;
+}
+
+function intersect(x1, y1, x2, y2, x3, y3, x4, y4) {
+
+  // Check if none of the lines are of length 0
+	if ((x1 === x2 && y1 === y2) || (x3 === x4 && y3 === y4)) {
+		return false
+	}
+
+	denominator = ((y4 - y3) * (x2 - x1) - (x4 - x3) * (y2 - y1))
+
+  // Lines are parallel
+	if (denominator === 0) {
+		return false
+	}
+
+	let ua = ((x4 - x3) * (y1 - y3) - (y4 - y3) * (x1 - x3)) / denominator
+	let ub = ((x2 - x1) * (y1 - y3) - (y2 - y1) * (x1 - x3)) / denominator
+
+  // is the intersection along the segments
+	if (ua < 0 || ua > 1 || ub < 0 || ub > 1) {
+		return false
+	}
+
+  // Return a object with the x and y coordinates of the intersection
+	let x = x1 + ua * (x2 - x1)
+	let y = y1 + ua * (y2 - y1)
+
+	return {x, y}
+}
