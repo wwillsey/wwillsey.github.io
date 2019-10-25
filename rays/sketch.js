@@ -1,13 +1,22 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 const MAX_DEPTH = 6;
 const SCALE = 1;
-const N_RAYS = 12000;
+const N_RAYS = 1200;
 
 const noPrint = true;
 const renderMode = false;
 
 let E;
 let world;
+
+let gui;
+
+const mouse = {
+  active: true,
+  last_gui_interaction: 0
+};
+
+let rendered = false;
 
 function keyPressed(){
   switch (key) {
@@ -18,10 +27,18 @@ function keyPressed(){
   }
 }
 
+function mouseClicked() {
+  if (constrain(mouseX, 0, width) == mouseX && constrain(mouseY, 0, height) == mouseY && Date.now() - mouse.last_gui_interaction > 2000) {
+    mouse.active = !mouse.active;
+    rendered = !mouse.active;
+  }
+}
+
 function setup() {
-  // createCanvas(displayWidth * 2, displayHeight * 2);
-  createCanvas(2880 * 2, 1800 * 2);
+  createCanvas(displayWidth, displayHeight);
+  // createCanvas(2880, 1800);
   E = new p5.Ease();
+  gui = new GUI();
 
   if (noPrint) {
     print = () => {};
@@ -47,8 +64,8 @@ function setup() {
     // ], {}),
     // makeMirrorCircle(createVector(width * .5, height / 2), 200, 1000, TWO_PI * .25, TWO_PI * .75),
     // makeMirrorCircle(createVector(width * .55, height / 2), 200, 1000, 0, TWO_PI * .3),
-    // makeMirrorCircle(createVector(width * .65, height * .43), 400, 100, TWO_PI * .5, TWO_PI)
-    new CircularWorldObject(createVector(width / 2, height / 2), 1250),
+    // makeMirrorCircle(createVector(width/2, height/2), height/2, 1400, x => .2 + noise(sin(x * PI), cos(x* PI))),
+    new CircularWorldObject(createVector(width / 2, height / 2), height * .45),
     // new CircularWorldObject(createVector(width / 3, height / 2), 100),
   ]
 
@@ -61,23 +78,29 @@ function setup() {
 let aveRenderSpeed = 0;
 
 function draw() {
+  if (rendered) {
+    return;
+  }
   blendMode(DARKEST);
   background(color(6, 5, 4,255));
   blendMode(ADD);
 
   scale(SCALE)
 
-  // translate(-width/2, -height/2)
-  const mouse = createVector(mouseX, mouseY).mult(1/SCALE);
+  if (mouse.active) {
+    mouse.pt = createVector(mouseX, mouseY).mult(1/SCALE);
+  }
+
   // const mouse = createVector(width * .4, height * .36).mult(1/SCALE);
-  const rays = createRayCone(mouse.copy(), 0, TWO_PI, N_RAYS);
+  const rays = createRayCone(mouse.pt.copy(), 0, TWO_PI, gui.nRays);
   // const rays = [new Ray(createVector(0, 500), 0, {depth: 0})]
 
   stroke(200)
   strokeWeight(5)
   world.render();
-  stroke(color(241, 235, 232, 1))
-  strokeWeight(2)
+  // stroke(color(241, 235, 232, 1))
+  stroke(color(...gui.color))
+  strokeWeight(gui.stroke_weight)
   // const startTime = Date.now();
   rays.forEach(ray => ray.render())
   // aveRenderSpeed += Date.now() - startTime;
@@ -87,6 +110,8 @@ function draw() {
   }
   if (renderMode)
   noLoop();
+
+  rendered = !mouse.active;
 }
 
 
@@ -139,7 +164,7 @@ class CircularWorldObject {
 
   render() {
     fill(0, 0);
-    circle(this.center.x, this.center.y, this.radius * 2);
+    circle(this.center.x, this.center.y, this.radius * 2, this.radius * 2, 100, 100);
   }
 
   cast(ray) {
@@ -240,7 +265,7 @@ class World {
 
     const endPt = intersection ? intersection.origin : ray.getOutOfWorldPt();
     segments.push([ray.origin, endPt])
-    if (intersection && intersection.opts.depth < MAX_DEPTH) {
+    if (intersection && intersection.opts.depth < gui.max_depth) {
       this.cast(intersection, segments);
       // circle(intersection.origin.x, intersection.origin.y, 3);
     }
@@ -272,6 +297,11 @@ class Ray {
   }
 
   render() {
+    // stroke(random([
+    //   color(255,0,0,1),
+    //   color(0,255,0,1),
+    //   color(0,0,255,1),
+    // ]));
     this.cast().forEach(segment => {
       line(segment[0].x, segment[0].y, segment[1].x, segment[1].y);
     })
@@ -292,9 +322,9 @@ function createRayCone(pt, dir, ang, nRays) {
 }
 
 
-function makeMirrorCircle(center, rad, n, start = 0, stop = TWO_PI) {
+function makeMirrorCircle(center, rad, n, fn = x=>1, start = 0, stop = TWO_PI) {
   const segments = [];
-  const fn = E.iterativeSquareRoot;
+  // const fn = E.iterativeSquareRoot;
 
   for(let i = 0; i < n; i++) {
     const offset1 = fn(i / n);
@@ -306,4 +336,25 @@ function makeMirrorCircle(center, rad, n, start = 0, stop = TWO_PI) {
       segments.push([pt1, pt2]);
   }
   return new MirrorObject(segments, {});
+}
+
+
+function preserveMouse() {
+  mouse.last_gui_interaction = Date.now();
+  rendered = false;
+}
+
+class GUI {
+  constructor() {
+    this.gui = new dat.GUI();
+
+    this.nRays = N_RAYS;
+    this.gui.add(this, 'nRays', 1, 20000).onChange(preserveMouse)
+    this.max_depth = MAX_DEPTH;
+    this.gui.add(this, 'max_depth', 1, 20).onChange(preserveMouse)
+    this.stroke_weight = 1;
+    this.gui.add(this, 'stroke_weight', 0, 10).onChange(preserveMouse)
+    this.color = [255,255,255,1]
+    this.gui.addColor(this, 'color').onChange(preserveMouse)
+  }
 }
