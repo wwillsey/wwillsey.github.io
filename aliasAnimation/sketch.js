@@ -144,7 +144,7 @@ function noisy(canvas, frame) {
 
 function createAndRunAnimation() {
   animation = new Animation(opts);
-  animation.renderFinal(totalFrames, noisy);
+  animation.renderFinal(totalFrames, imageMove);
 };
 
 

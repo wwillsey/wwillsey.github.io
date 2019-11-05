@@ -37,7 +37,7 @@ function vecCos(vec) {
   return createVector(cos(vec.x), cos(vec.y), cos(vec.z));
 }
 
-function getT(x,y) {
-  // return pow(noise(x * noiseScale, y * noiseScale, frameCount * .1) , 2)
-  return x /
-}
+// function getT(x,y) {
+//   // return pow(noise(x * noiseScale, y * noiseScale, frameCount * .1) , 2)
+//   return x /
+// }
