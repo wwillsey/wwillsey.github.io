@@ -1,23 +1,42 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let D,F,I;
 let img;
+let mainCanvas;
 
-let fieldShader;
+const MID = 127;
+const forceShaderModifier = .01;
+
+let fieldShader, fieldShader2;
+let blur;
+
+// function mouseDragged(event) {
+//   print(event);
+// }
 
 function preload() {
-  img = loadImage('http://localhost:3000/colorWalk/cloudy.jpeg');
+  img = loadImage('paint2.jpg');
   fieldShader = loadShader('effect.vert', 'effect.frag');
+  fieldShader2 = loadShader('effect.vert', 'effect.frag');
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
-  // F = new ForceField(30, 30, () => createVector(0,0), {});
-  F = new ForceField(30, 30, (x,y) => createVector(noise(x, 0)-.5, noise(y, 1000000)-.5).mult(.1), {});
+  mainCanvas = createCanvas(displayWidth, displayHeight);
+  img.resize(width, height)
+  print(img.width, img.height)
+  F = new ForceField(width/3, height/3, () => createVector(0,0), {});
+  // F = new ForceField(width/2, height/2, (x,y) =>{
+  //   if(dist(x,y,width/4, height/4) < 100) {
+  //     return createVector(x-width/4, y-height/4).normalize()
+  //   }
+  //   return createVector(0,0)
+  // }, {});
+  // F = new ForceField(width/2, height/2, (x,y) => createVector(tan(TWO_PI * y * .005), tan(TWO_PI*x * .005)).mult(1), {});
+  // F = new ForceField(width/3, height/3, (x,y) => createVector(.1,0).rotate((noise(x * .01,y * .01) - .5) * 2 * TWO_PI ), {});
   // img.resize(300,300)
   // print(getValsUsingCircleCursor(createVector(width/2, height/2), 1, width, height))
   D = new DragDistorter(F, {
     cursorRadiusPercent: .05,
-    strength: 2,
+    strength: 1,
   })
 
   I = new ImageFieldWarp(img, D, {});
@@ -25,18 +44,27 @@ function setup() {
   // print(D.getNearbyForces(.1))
 }
 
+let mouseWasDown = false;
 function draw() {
   if (!img)
   return
   background(0)
-  D.updateState(createVector(mouseX / width, mouseY / height));
 
+  D.updateState(createVector(mouseX / width, mouseY / height));
   if(mouseIsPressed) {
+    if(!mouseWasDown) {
+      print('clearing state');
+      D.clearState();
+    }
     D.updateField();
+    mouseWasDown = true;
+  } else {
+    mouseWasDown = false;
   }
-  F.render();
+  // F.render();
 
   I.applyShaderWarp();
+  // I.applyForceWarp();
   I.renderWithShader();
 }
 
@@ -51,43 +79,45 @@ class ImageFieldWarp {
     this.img.loadPixels();
 
     this.shaderLayer = createGraphics(img.width * 1, img.height * 1, WEBGL);
-  }
+    this.forceLayer = createGraphics(this.distorter.field.cols, this.distorter.field.rows, WEBGL);
+    this.shaderLayer.image(this.img, -this.shaderLayer.width/2, -this.shaderLayer.height/2, this.shaderLayer.width, this.shaderLayer.height);
+    this.forceLayer.image(this.distorter.field.field, -this.forceLayer.width/2, -this.forceLayer.height/2, this.forceLayer.width, this.forceLayer.height);
 
-  applyWarp() {
-    this.img.loadPixels();
-    const newImg = createImage(this.img.width, this.img.height);
-    newImg.loadPixels();
-    for(let x = 0; x < this.img.width; x++) {
-      for(let y = 0; y < this.img.height; y++) {
-        // const current = img.get(x,y);  //TODO
-        const force = this.distorter.field.getForceAt({x: x / img.width, y: y / img.height}, .01);
-        force.setMag(1.5)
-        // if (force.mag() > 0)
-        // print(x,y, force)
-        newImg.set(x,y, this.img.get(round(x - force.x), round(y - force.y)));
-      }
-    }
-    newImg.updatePixels();
-    this.img = newImg;
   }
 
   applyShaderWarp() {
-    this.shaderLayer.image(this.img, -this.shaderLayer.width/2, -this.shaderLayer.height/2, this.shaderLayer.width, this.shaderLayer.height);
     this.shaderLayer.shader(fieldShader);
     fieldShader.setUniform('img', this.shaderLayer);
-    fieldShader.setUniform('resolution', [this.shaderLayer.width, this.shaderLayer.height]);
+    fieldShader.setUniform('imgResolution', [this.shaderLayer.width, this.shaderLayer.height]);
     fieldShader.setUniform('forceDimensions', [this.distorter.field.cols, this.distorter.field.rows]);
-
-    const forces = []
-    this.distorter.field.field.forEach(row => row.forEach(val => {
-      forces.push(val.x);
-      forces.push(val.y);
-    }));
-    print(forces)
-    fieldShader.setUniform('forces', forces);
+    fieldShader.setUniform('forceModifier', forceShaderModifier);
+    fieldShader.setUniform('forces',this.distorter.field.field);
 
     this.shaderLayer.noStroke();
     this.shaderLayer.rect(-this.shaderLayer.width/2, -this.shaderLayer.height/2, this.shaderLayer.width, this.shaderLayer.height);
+  }
+
+  applyForceWarp() {
+
+
+    this.forceLayer.shader(fieldShader2);
+    // this.forceLayer.image(this.distorter.field.field, -this.forceLayer.width/2, -this.forceLayer.height/2, this.forceLayer.width, this.forceLayer.height);
+
+    fieldShader2.setUniform('img', this.distorter.field.field);
+    fieldShader2.setUniform('imgResolution', [this.forceLayer.width, this.forceLayer.height]);
+    fieldShader2.setUniform('forceDimensions', [this.distorter.field.cols, this.distorter.field.rows]);
+    fieldShader2.setUniform('forceModifier', forceShaderModifier  * .1);
+    fieldShader2.setUniform('forces', this.distorter.field.field);
+
+    this.forceLayer.noStroke();
+    this.forceLayer.rect(-this.forceLayer.width/2, -this.forceLayer.height/2, this.forceLayer.width, this.forceLayer.height);
+
+    this.distorter.field.field.image(this.forceLayer, 0, 0, this.distorter.field.cols, this.distorter.field.rows);
+    // this.distorter.field.field.background(MID, 5)
+    this.distorter.field.field.loadPixels();
+    // this.distorter.field.field.updatePixels();
+
+    // image(this.forceLayer, 0,0, width, height)
   }
 
   render() {
@@ -117,6 +147,12 @@ class DragDistorter {
     this.acc = newAcc;
   }
 
+  clearState() {
+    // this.pos = createVector(0,0);
+    this.vel = createVector(0,0);
+    this.acc = createVector(0,0);
+  }
+
   getCursorPts() {
     const radiusPercent = this.opts.cursorRadiusPercent;
     return getValsUsingCircleCursor({x: this.pos.x * this.field.cols, y: this.pos.y * this.field.rows}, radiusPercent * this.field.cols, this.field.cols, this.field.rows)
@@ -129,10 +165,44 @@ class DragDistorter {
 
   updateField() {
     const pts = this.getCursorPts();
+    // print('pts', pts)
+    const maxD = this.opts.cursorRadiusPercent * this.field.cols;
+    const center = createVector(floor(mouseX / width * this.field.cols), floor(mouseY / height * this.field.rows));
+
     pts.forEach(({row, col}) => {
-      this.field.get(row, col).add(this.vel.copy().mult(this.opts.strength)).limit(1);
+      const d = min(dist(center.x, center.y, col, row), maxD);
+      const dM = max(.001, pow(maxD - d, .2));
+
+      if (!dM || isNaN(dM)) {
+        return;
+      }
+
+      if (this.vel.mag() > 0) {
+        const newVal = this.field.get(row, col).add(this.vel.copy().mult(this.opts.strength * dM)).limit(1);
+        this.field.set(row, col, newVal);
+      }
     });
+    this.field.field.updatePixels();
   }
+
+  // updateField() {
+  //   this.field.field.applyVel(createVector(mouseX / width, mouseY / height), this.cursorRadiusPercent * width);
+  // }
+}
+
+
+function vec2Color(v) {
+  const r = map(v.x, -1, 1, 0, 255);
+  const g = map(v.y, -1, 1, 0, 255);
+  // const r = map(v.x, -1, 1, 0, 255);
+
+  return [r,g];
+}
+
+function color2Vec(c) {
+  const x = map(c[0], 0, 255, -1, 1);
+  const y = map(c[1], 0, 255, -1, 1);
+  return createVector(x,y);
 }
 
 
@@ -142,7 +212,17 @@ class ForceField {
     this.cols = cols;
     this.opts = opts;
 
-    this.field = Array.from({length: rows}, (v, row) => Array.from({length: cols}, (v2, col) => initState(row, col)));
+    this.field = createGraphics(cols, rows);
+    this.field.pixelDensity(1);
+    this.field.background(255/2);
+    this.field.loadPixels();
+
+    for(let y = 0; y < rows; y++) {
+      for(let x = 0; x < cols; x++) {
+        this.set(y,x, initState(x,y))
+      }
+    }
+    this.field.updatePixels();
   }
 
 
@@ -164,41 +244,31 @@ class ForceField {
   get(row, col) {
     if (row >= this.rows || row < 0 || col >= this.cols || col < 0)
       throw new Error('out of bounds');
-    return this.field[row][col];
+    let off = (row * this.field.width + col)  * 4;
+    let components = [
+      this.field.pixels[off],
+      this.field.pixels[off + 1],
+      0
+    ];
+    const v = color2Vec(components);
+    // print('getting', col, row, c, v);
+    return v;
   }
   set(row, col, val) {
     if (row >= this.rows || row < 0 || col >= this.cols || col < 0)
       throw new Error('out of bounds');
-    this.field[row][col] = val;
+    // this.field[row][col] = val;
+    // print('setting', col, row, vec2Color(val))
+    let off = (row * this.field.width + col)  * 4;
+
+    const c = vec2Color(val);
+    this.field.pixels[off] = int(c[0]);
+    this.field.pixels[off + 1] = int(c[1]);
   }
-
-  renderForce(row, col) {
-    const force = this.field[row][col];
-
-    // push()
-    // fill(200)
-    // fill(random(255));
-    const pt = createVector(col * width / this.cols, row * height / this.rows);
-    const dim = createVector(width / this.cols, height / this.rows);
-    // rect(pt.x, pt.y, dim.x, dim.y);
-
-    const forceCenter = dim.copy().mult(.5).add(pt);
-    const forceEnd = force.copy().mult(dim.mag() / 2).add(forceCenter);
-
-    // stroke(255);
-    line(forceCenter.x, forceCenter.y, forceEnd.x, forceEnd.y);
-
-    // pop();
-  }
-
 
   render() {
-    stroke(255)
-    for(let row = 0; row < this.rows; row ++) {
-      for(let col = 0; col < this.cols; col ++) {
-        this.renderForce(row, col);
-      }
-    }
+    // this.field.updatePixels();
+    image(this.field, 0, 0, width, height)
   }
 }
 

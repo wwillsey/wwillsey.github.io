@@ -27,6 +27,10 @@ function keyPressed(){
   }
 }
 
+function touchMoved() {
+  return false;
+}
+
 function mouseClicked() {
   if (constrain(mouseX, 0, width) == mouseX && constrain(mouseY, 0, height) == mouseY && Date.now() - mouse.last_gui_interaction > 2000) {
     mouse.active = !mouse.active;
@@ -65,7 +69,7 @@ function setup() {
     // makeMirrorCircle(createVector(width * .5, height / 2), 200, 1000, TWO_PI * .25, TWO_PI * .75),
     // makeMirrorCircle(createVector(width * .55, height / 2), 200, 1000, 0, TWO_PI * .3),
     // makeMirrorCircle(createVector(width/2, height/2), height/2, 1400, x => .2 + noise(sin(x * PI), cos(x* PI))),
-    new CircularWorldObject(createVector(width / 2, height / 2), height * .45),
+    new CircularWorldObject(createVector(width / 2, height / 2), height * .2),
     // new CircularWorldObject(createVector(width / 3, height / 2), 100),
   ]
 
