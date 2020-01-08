@@ -9,6 +9,7 @@ varying vec2 vTexCoord;
 // our textures coming from p5
 // uniform sampler2D tex0;
 uniform sampler2D img;
+uniform sampler2D sourceImg;
 uniform vec2 imgResolition;
 uniform float forceModifier;
 
@@ -83,8 +84,9 @@ void main() {
   vec3 col = texture2D_bilinear(img, uv - dir, imgResolition,  vec2(1.0,1.0) / imgResolition).rgb;
   // vec3 col = texture2D(forces, uv).rgb;
 
-  // vec3 src = texture2D(sourceImg, uv).rgb;
+  vec3 src = texture2D(sourceImg, uv).rgb;
 
-  // float percent = .0;
-  gl_FragColor = vec4(col, 1.0);
+  float percent = 1.;
+
+  gl_FragColor = vec4(mix(src, col, percent), 1.0);
 }

@@ -3,17 +3,17 @@ let containers;
 let fft;
 let gui;
 
-let rows = 6;
-let cols = 8;
+let rows = 4;
+let cols = 5;
 
-let xResolution = 2200;
-let yResolution = 2200;
+let xResolution = 1000;
+let yResolution = 1000;
 
 const programLength = 50;
 const mutateBy = 2;
 
 const useMusic = true;
-const useBackgroundImage = true;
+const useBackgroundImage = false;
 const useBackgroundVideo = false;
 const useCamera = false;
 let backgroundImage;
@@ -41,18 +41,22 @@ const operators = [
   '/',
   'dist',
   'dup',
-  // 'drop',
-  // 'rotate',
+  'drop',
+  'rotate',
   'pow',
   'getFromBackgroundRed',
   'getFromBackgroundGreen',
   'getFromBackgroundBlue',
   'mod',
   'getAudioEnergy',
+  'max',
+  'min',
 ];
 const symbols = [
   'x',
   'y',
+  'mouseX',
+  'mouseY',
   'distFromMiddle',
   'time',
   'musicAmplitude',
@@ -60,7 +64,7 @@ const symbols = [
   'backgroundImageRed',
   'backgroundImageGreen',
   'backgroundImageBlue',
-  'backgroundImageDelta'
+  'backgroundImageDelta',
 ];
 
 
@@ -127,13 +131,13 @@ function setup() {
   createCanvas(displayWidth-200, displayHeight, WEBGL);
   shaderLayer = createGraphics(width, height, WEBGL);
   if (useBackgroundVideo) {
-    backgroundVideo = createVideo('http://localhost:3000/geneticLanguage/videos/archimedes.mp4');
+    backgroundVideo = createVideo('../media/twistedhall.mov');
     backgroundVideo.loop();
     backgroundVideo.hide();
   }
 
 
-  gui = new GUI(operators, symbols);
+  gui = new geneticGUI(operators, symbols);
   noStroke();
   frameRate(60);
   // randomSeed(0);
@@ -215,7 +219,7 @@ function draw() {
   // sphere(1000)
   fill(255);
   textSize(25)
-  text(frameRate(), 10, 10);
+  // text(frameRate(), 10, 10);
 
   getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
   pop();
@@ -388,9 +392,9 @@ function expToString(exp) {
 
 function mutateExp(exp) {
   const res = exp.slice();
-  if (random() < .5) {
-    let n = mutateBy;
-    while (n--) {
+  if (random() < 1) {
+    let n = gui.mutateBy;
+    while (n-- > 0) {
       const idx = floor(random(0, res.length));
       res[idx] = genTerm();
     }
@@ -402,11 +406,15 @@ function mutateExp(exp) {
 }
 
 function mergeExps(expDest, expSrc) {
+  let n = gui.mergeNtimes;
+
   const res = expDest.slice()
-  const idx1 = floor(random(0, expDest.length))
-  const idx2 = floor(random(0, expDest.length))
-  // print(idx1, idx2)
-  arrayCopy(expSrc, min(idx1, idx2), res, min(idx1, idx2), abs(idx1 - idx2));
+  while (n-- > 0) {
+    const idx1 = floor(random(0, expDest.length))
+    const idx2 = floor(random(0, expDest.length))
+    // print(idx1, idx2)
+    arrayCopy(expSrc, min(idx1, idx2), res, min(idx1, idx2), abs(idx1 - idx2));
+  }
   return res;
 }
 
@@ -432,7 +440,7 @@ function cull() {
 
   toKill.forEach(container => {
     const survivor = random(survivors);
-    container.exp = random() < .5 ?
+    container.exp = random() < gui.mutateChance ?
       mutateExp(survivor.exp) :
       mergeExps(random(survivors).exp, survivor.exp);
     // container.render();
@@ -455,6 +463,9 @@ class Container {
 
   toggleSelection() {
     this.selected = !this.selected;
+    if(this.selected) {
+      print(this.exp)
+    }
   }
 
   renderSelectionHighlighting() {
@@ -494,8 +505,8 @@ class Container {
         case '*': push(`${pop()} * ${pop()}`); break;
         case 'dist': const [a,b,c,d] = [pop(), pop(), pop(), pop()]; push(`pow(${a} - ${c}, 2.0) + pow(${b} - ${d}, 2.0)`); break;
         case 'dup': const x = pop(); push(x); push(x); break;
-        // case 'drop': pop(); break;
-        // case 'rotate': length > 0 && push(splice(0,1)[0]); break;
+        case 'drop': pop(); break;
+        case 'rotate': length > 0 && push(splice(0,1)[0]); break;
         case 'pow': push(`pow(${pop()}, ${pop()})`); break;
         case 'atan': push(`atan(${pop()}, ${pop()})`); break;
         case 'getFromBackgroundRed': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).r`); break;
@@ -503,6 +514,8 @@ class Container {
         case 'getFromBackgroundGreen': push(`texture2D(backgroundImage, vec2(x,y) + ${pop()} * vec2(${pop()}, ${pop()})).b`); break;
         case 'getAudioEnergy': push(`getEnergy(int(clamp(${pop()}, 0.0, 0.999999)))`); break;
         case 'mod': push(`mod(${pop()}, ${pop()})`); break;
+        case 'max': push(`max(${pop()}, ${pop()})`); break;
+        case 'min': push(`min(${pop()}, ${pop()})`); break;
         default:
           // push(env[val] != undefined ? env[val] : val);
           push(val)
@@ -527,7 +540,7 @@ class Container {
 
 
 
-class GUI {
+class geneticGUI {
   constructor(operators, symbols) {
     this.gui = new dat.GUI({width: 200});
 
@@ -553,8 +566,16 @@ class GUI {
     addButton('cull');
     addButton('toggleMusic');
     addButton('toggleMaximize');
+
+    this.addValue('mutateBy', mutateBy, 0, 100);
+    this.addValue('mutateChance', .5, 0, 1);
+    this.addValue('mergeNtimes', 1, 0, 10);
   }
 
+  addValue(name, defaultVal, start, end) {
+    this[name] = defaultVal;
+    this.gui.add(this, name, start, end);
+  }
 
   resetTime() {
     time = 0;

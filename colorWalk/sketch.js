@@ -5,39 +5,48 @@ let backgroundGradient = {}
 
 const isHSB = false;
 const backgroundEnabled = true;
-const useBackgroundSourceImage = false;
+const useBackgroundSourceImage = true;
 const maxColorVal = isHSB ? 100 : 255;
-const backgroundSplitMean = .993;
-const backgroundSplitVariance = .1;
-const nborWeight = .1;
+const backgroundSplitMean = .98;
+const backgroundSplitVariance = .05;
+const nborWeight = .3;
 const shuffleIn = true;
 
 const useDepth = false;
-const depthScale = 1000;
+const depthScale = 50000;
 const maxDepth = 0;
 
 const backgroundNegative = true;
 let wipeScreen = true;
 
-const scale = 1.5
-const useDisplayDimensions = true;
+const scale = 1
+const useDisplayDimensions = false;
 const isGreyscale = false;
 
 
 let stdDevs;
-const stdDevFn = () => randomGaussian(2, 0.01)
+const stdDevFn = () => randomGaussian(2, 0.1)
 let data;
 
 
 let numRuns = 0;
 let seed;
+let xBgOffset = 150;
+let yBgOffset = 50;
 
 function preload() {
   // backgroundImg = loadImage('http://localhost:3000/curve/starry.jpg');
-  backgroundImg = loadImage('http://localhost:3000/colorWalk/cloudy.jpeg');
+  backgroundImg = loadImage('http://localhost:3000/media/IMG_2039.JPG');
 
 }
 
+function myDist(x1, y1, x2, y2) {
+  // print('used');
+  // remove();
+  let a = (x1 - x2);
+  let b = (y1 - y2);
+  return Math.sqrt(a*a + b * b)
+}
 
 // function mousePressed() {
 //   if(focused)
@@ -94,8 +103,13 @@ function setup() {
     createCanvas(displayWidth, displayHeight) :
     createCanvas(2880 * scale, 1800 * scale);
 
-  backgroundImg.resize(width, height)
+  backgroundImg.resize(0, height)
+  xBgOffset += (width - min(width, backgroundImg.width)) /2;
+  yBgOffset += (height - min(height, backgroundImg.height)) /2;
   seed = round(random(0, 100000));
+  p5._validateParameters = () => {
+
+  }
   start();
 }
 
@@ -110,7 +124,7 @@ function draw() {
 function getRandomPixelIndex(frontier) {
   // const index = 0;
 
-  let index = random(frontier.length * .998, frontier.length * .99995)
+  let index = random(frontier.length * .9975, frontier.length * .99995)
 
   // const index = random(0, frontier.length - 1);
   // const index = randomGaussian(frontier.length * .95, frontier.length * .1)
@@ -147,7 +161,7 @@ function applyColor(x, y, d) {
     backgroundImg.set(x,y, color(HSVtoRGB(...col)));
   } else {
     img.set(x,y, color(col))
-    backgroundImg.set(x,y, color(col))
+    backgroundImg.set(x - xBgOffset,y - yBgOffset, color(col))
   }
   // colorWithCircle(x,y,col);
 
@@ -161,7 +175,9 @@ function createFrontier(img, xPos, yPos) {
   const frontier = [{
     x: xPos || img.width / 2,
     y: yPos || img.height / 2,
-    col: [random(0, maxColorVal),random(0, maxColorVal),random(0, maxColorVal)]
+    col: useBackgroundSourceImage ?
+    backgroundImg.get(backgroundImg.width / 2, backgroundImg.height / 2) :
+    [random(0, maxColorVal),random(0, maxColorVal),random(0, maxColorVal)]
   }];
 
   // const col1 = color(random(0,255),random(0,255),random(0,255));
@@ -189,7 +205,7 @@ function getNbors(p, img) {
       const x = dx + p.x;
       const y = dy + p.y;
       if ((dx != 0 || dy != 0) && x >= 0 && x < img.width && y >= 0 && y < img.height) {
-        if (dist(x,y, img.width/2, img.height/2) < img.height * .45)
+        if (myDist(x,y, img.width/2, img.height/2) < img.height * .45)
         nbors.push({ x,y })
       }
     }
@@ -243,7 +259,8 @@ function modifyColor(d, p) {
   const useBackgroundData = backgroundEnabled && (useBackgroundSourceImage || ! (numRuns === 1));
 
   if (useBackgroundData) {
-    backgroundCol = backgroundImg.get(p.x,p.y);
+
+    backgroundCol = backgroundImg.get(p.x - xBgOffset, p.y - yBgOffset);
     split = randomGaussian(backgroundSplitMean, backgroundSplitVariance);
   }
 
@@ -260,7 +277,7 @@ function modifyColor(d, p) {
   let b = constrain(gaussianFn(x => (x[2]), center[2], stdDevs[2]), 0, maxColorVal);
 
   if (useDepth) {
-    const distanceFactor = (.45 * height - dist(p.x, p.y, width/2, height/2)) / (.45 * height);
+    const distanceFactor = (.45 * height - myDist(p.x, p.y, width/2, height/2)) / (.45 * height);
     r += depth / depthScale * distanceFactor;
     g += depth / depthScale * distanceFactor;
     b += depth / depthScale * distanceFactor;
@@ -315,11 +332,11 @@ function createColorWalk(img, frontier, hard = false) {
 function getByGradient(frontier, img) {
   let indx = 0;
   let val = getGradientAt(frontier[0], img);
-  val = dist(0,0, val.x, val.y);
+  val = myDist(0,0, val.x, val.y);
 
   frontier.forEach((p,i) => {
     const {x,y} = getGradientAt(p, img);
-    const d = dist(0,0, x, y);
+    const d = myDist(0,0, x, y);
 
     if (d > val) {
       val = d;

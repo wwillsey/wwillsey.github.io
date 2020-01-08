@@ -38,7 +38,7 @@ function setup() {
 
 function draw() {
   background(255)
-  c.render(50)
+  c.render(500)
   // image(dataLayer,0 ,0);
 }
 
@@ -88,35 +88,38 @@ class Circle {
     return interceptCircleLineSeg(c, l);
   }
 
-  // generateConnections(n) {
-  //   const graph = [];
-
-  //   while(n) {
-  //     const {pt, data} = this.getRandomDataPt();
-  //     const val = (red(data) + green(data) + blue(data)) / (255 * 3);
-
-  //     stroke(data);
-  //     if (randomGaussian(val, .05) > .9 || randomGaussian(val, .05) < .1) {
-  //       graph.push(this.getIntersections(pt))
-  //       n--;
-  //     }
-  //   }
-  //   return graph;
-  // }
-
   generateConnections(n) {
-    const step = TWO_PI / this.opts.numPts;
-    const start = round(frameCount / 2) * step;
-    const nPts = n;
-    const result = [];
-    for (let i = 0; i < nPts; i++) {
-      const pt1 = this.getPointAtAngle(start + i * step);
-      // print(pt1)
-      const pt2 = this.getPointAtAngle(start + round(i + sin(frameCount / 50) * this.opts.numPts / 2.5 ) * step);
-      result.push([pt1, pt2]);
+    const graph = [];
+    randomSeed(1)
+
+    while(n) {
+      const {pt, data} = this.getRandomDataPt();
+      const val = (red(data) + green(data) + blue(data)) / (255 * 3);
+
+      stroke(data);
+      if (randomGaussian(val, .05) > .9 || randomGaussian(val, .05) < .1) {
+        const pts = this.getIntersections(pt);
+        pts.push(data);
+        graph.push(pts)
+        n--;
+      }
     }
-    return result;
+    return graph;
   }
+
+  // generateConnections(n) {
+  //   const step = TWO_PI / this.opts.numPts;
+  //   const start = round(frameCount / 2) * step;
+  //   const nPts = n;
+  //   const result = [];
+  //   for (let i = 0; i < nPts; i++) {
+  //     const pt1 = this.getPointAtAngle(start + i * step);
+  //     // print(pt1)
+  //     const pt2 = this.getPointAtAngle(start + round(i + sin(frameCount / 50) * this.opts.numPts / 2.5 ) * step);
+  //     result.push([pt1, pt2]);
+  //   }
+  //   return result;
+  // }
 
   render(n) {
     // fill(0);
@@ -130,8 +133,9 @@ class Circle {
 
     // }
 
-    this.generateConnections(n).forEach(([p1, p2]) => {
+    this.generateConnections(n).forEach(([p1, p2, col]) => {
       // print(p1, p2)
+      stroke(col)
       line(p1.x, p1.y, p2.x, p2.y);
     })
   }

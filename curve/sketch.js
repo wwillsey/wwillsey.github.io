@@ -1,15 +1,20 @@
 let img;
 let choiceFn;
 let backgroundColor;
+let gui;
+
+let pD;
+let looping = false;
 
 function preload() {
   print('preload')
   // img = loadImage('https://upload.wikimedia.org/wikipedia/commons/5/52/Electricsheep-3404.jpg');
   // img = loadImage('https://i.pinimg.com/736x/bd/eb/10/bdeb10474d1d6e6c2d15ad7dcbe568a9.jpg');
-  img = loadImage('http://localhost:3000/colors.jpg');
+  img = loadImage('http://localhost:3000/media/IMG_3968.JPG');
 }
 
 function keyPressed() {
+  print('key', `'${key}'`, keyCode)
   switch(keyCode) {
     case ENTER:
       remove()
@@ -18,17 +23,37 @@ function keyPressed() {
       saveCanvas('myCanvas', 'jpg');
       break
   }
+
+  switch(key) {
+    case ' ':
+      looping = !looping;
+      looping ? loop(): noLoop();
+      break;
+  }
 }
 
 function setup() {
-  randomSeed(0);
+  // randomSeed(0);
   choiceFn = 'MIN';
-  backgroundColor = color(240);
-  img.resize(800,0);
+  backgroundColor = color(250);
+  img.resize(displayWidth,0);
+
+  img.loadPixels();
   createCanvas(img.width, img.height);
 
-  background(255, 255, 255)
+  gui = new GUI();
+  gui.add('strokeWeight', 1, 0, 10);
+  gui.add('alpha', 0, 0, 255);
+  gui.add('curveScale', 20, 1, 100);
+  gui.add('compares', 10, 1, 100);
+  gui.add('samples', 10, 1, 100);
+
+  print(img)
+  background(backgroundColor)
   // image(img,0,0)
+  pD = 1//img.pixelDensity(); // set these to the coordinates
+
+  noLoop();
 }
 
 function draw() {
@@ -37,8 +62,8 @@ function draw() {
 
   // drawCurveGrid(6, 1, img);
 
-  for(let i = 0; i < 50; i++) {
-    drawRandom(10, 10);
+  for(let i = 0; i < 100; i++) {
+    drawRandom(gui.compares, gui.samples);
   }
 
 
@@ -69,8 +94,8 @@ function loadImageIndex(i) {
 }
 
 function drawRandom(n, samples) {
-  const xs = width / max(randomGaussian(20, 6), .5);
-  const ys = height / max(randomGaussian(20, 6), .5);
+  const xs = width / max(randomGaussian(gui.curveScale, 3), .5);
+  const ys = height / max(randomGaussian(gui.curveScale * width / height, 3), .5);
   const x = random(0, width / xs - 1);
   const y = random(0, height / ys - 1);
 
@@ -79,7 +104,7 @@ function drawRandom(n, samples) {
   const sample = sampleCurve(c.c, samples, img, 0, img.width, 0, img.height);
   const col = processSampleAve(sample, 5);
   if (col) {
-    drawCurve(c.c, color(col[0],col[1],col[2],50));
+    drawCurve(c.c, color(col[0],col[1],col[2],gui.alpha));
   }
 }
 
@@ -122,7 +147,7 @@ function drawCurveGrid(n, z, img) {
         const sample = sampleCurve(c.c, 5, img, 0, img.width, 0, img.height);
         const col = processSampleAve(sample, 5);
         if (col) {
-          drawCurve(c.c, color(col[0],col[1],col[2], 50));
+          drawCurve(c.c, color(col[0],col[1],col[2], gui.alpha));
         }
         // print(getBezierPts(c, 10))
       }
@@ -255,7 +280,7 @@ function sampleCurve(c, steps, img, xMin, xMax, yMin, yMax) {
     y = round(y);
     const cx = constrain(x, xMin, xMax);
     const cy = constrain(y, yMin, yMax);
-    return cx === x && cy === y ? img.get(x, y) : undefined;
+    return cx === x && cy === y ? imgGet(img, x, y) : undefined;
   });
 }
 
@@ -280,15 +305,15 @@ function drawCurve(c, col) {
   y4
 } = c;
 
-  strokeWeight(2);
+  strokeWeight(gui.strokeWeight);
   noFill();
   if(col) {
     stroke(col);
   } else {
-    stroke(10, 10, 10, 100);
+    stroke(10, 10, 10, gui.alpha);
   }
   bezier(x1, y1, x2, y2, x3, y3, x4, y4);
-  fill(255);
+  // fill(255);
 }
 
 
@@ -310,4 +335,18 @@ function getRandomCurve(xMin, xMax, yMin, yMax) {
     y3: c[2].y,
     y4: c[3].y,
   };
+}
+
+function imgGet(img, x,y) {
+  // return img.get(x,y)
+  let off = (y * img.width + x) * pD * 4;
+  // print('ahhh', x,y, off);
+  let components = [
+    img.pixels[off],
+    img.pixels[off + 1],
+    img.pixels[off + 2],
+    img.pixels[off + 3]
+  ];
+  // print(c1,c2);
+  return components;
 }

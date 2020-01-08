@@ -30,6 +30,8 @@ function setup() {
   fft = new p5.FFT();
   fft.smooth();
   gui = new GUI();
+  gui.addColor('color1', [0,0,0]);
+  gui.addColor('color2', [255,255,255]);
   noiseCache = new CachedNoise(.01);
 }
 
@@ -99,16 +101,16 @@ function createContourHole(center, w, h, r) {
 }
 
 
-class GUI {
-  constructor() {
-    this.gui = new dat.GUI();
+// class GUI {
+//   constructor() {
+//     this.gui = new dat.GUI();
 
-    this.color1 = [0,0,0]
-    this.gui.addColor(this, 'color1');
-    this.color2 = [255,255,255]
-    this.gui.addColor(this, 'color2');
-  }
-}
+//     this.color1 = [0,0,0]
+//     this.gui.addColor(this, 'color1');
+//     this.color2 = [255,255,255]
+//     this.gui.addColor(this, 'color2');
+//   }
+// }
 
 
 class CachedNoise {

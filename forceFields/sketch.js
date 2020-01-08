@@ -2,9 +2,12 @@
 let D,F,I;
 let img;
 let mainCanvas;
+let gui;
+
+const RENDER_FORCE = false;
 
 const MID = 127;
-const forceShaderModifier = .01;
+const forceShaderModifier = .005;
 
 let fieldShader, fieldShader2;
 let blur;
@@ -14,7 +17,7 @@ let blur;
 // }
 
 function preload() {
-  img = loadImage('paint2.jpg');
+  img = loadImage('../media/IMG_0020.JPG');
   fieldShader = loadShader('effect.vert', 'effect.frag');
   fieldShader2 = loadShader('effect.vert', 'effect.frag');
 }
@@ -23,25 +26,33 @@ function setup() {
   mainCanvas = createCanvas(displayWidth, displayHeight);
   img.resize(width, height)
   print(img.width, img.height)
-  F = new ForceField(width/3, height/3, () => createVector(0,0), {});
+
+  gui = new GUI();
+  gui.add('brushSize', 30, 0, 100);
+  gui.add('brushStrength', 1.0, 0.0, 5.0);
+  gui.add('brushDensity', 50, 0, 100);
+
+  F = new ForceField(width, height, () => createVector(0,0), {});
   // F = new ForceField(width/2, height/2, (x,y) =>{
   //   if(dist(x,y,width/4, height/4) < 100) {
   //     return createVector(x-width/4, y-height/4).normalize()
   //   }
   //   return createVector(0,0)
   // }, {});
-  // F = new ForceField(width/2, height/2, (x,y) => createVector(tan(TWO_PI * y * .005), tan(TWO_PI*x * .005)).mult(1), {});
+  // F = new ForceField(width/2, height/2, (x,y) => createVector(sin(TWO_PI * y * .005), sin(TWO_PI*x * .005)).mult(1), {});
   // F = new ForceField(width/3, height/3, (x,y) => createVector(.1,0).rotate((noise(x * .01,y * .01) - .5) * 2 * TWO_PI ), {});
   // img.resize(300,300)
   // print(getValsUsingCircleCursor(createVector(width/2, height/2), 1, width, height))
   D = new DragDistorter(F, {
-    cursorRadiusPercent: .05,
+    cursorRadiusPercent: .08,
     strength: 1,
   })
 
   I = new ImageFieldWarp(img, D, {});
   // D.updateState(createVector(.5,.5));
   // print(D.getNearbyForces(.1))
+
+  updateFromGUI();
 }
 
 let mouseWasDown = false;
@@ -49,6 +60,7 @@ function draw() {
   if (!img)
   return
   background(0)
+  updateFromGUI();
 
   D.updateState(createVector(mouseX / width, mouseY / height));
   if(mouseIsPressed) {
@@ -61,14 +73,22 @@ function draw() {
   } else {
     mouseWasDown = false;
   }
-  // F.render();
 
-  I.applyShaderWarp();
   // I.applyForceWarp();
-  I.renderWithShader();
+
+  if (RENDER_FORCE) {
+    F.render();
+  } else {
+    I.applyShaderWarp();
+    I.renderWithShader();
+  }
 }
 
-
+function updateFromGUI() {
+  D.opts.cursorRadiusPercent = gui.brushSize / 300;
+  D.opts.strength = gui.brushStrength;
+  D.opts.brushDensity = gui.brushDensity / 100;
+}
 
 class ImageFieldWarp {
   constructor(img, distorter, opts) {
@@ -88,6 +108,7 @@ class ImageFieldWarp {
   applyShaderWarp() {
     this.shaderLayer.shader(fieldShader);
     fieldShader.setUniform('img', this.shaderLayer);
+    fieldShader.setUniform('sourceImg', this.img);
     fieldShader.setUniform('imgResolution', [this.shaderLayer.width, this.shaderLayer.height]);
     fieldShader.setUniform('forceDimensions', [this.distorter.field.cols, this.distorter.field.rows]);
     fieldShader.setUniform('forceModifier', forceShaderModifier);
@@ -106,7 +127,7 @@ class ImageFieldWarp {
     fieldShader2.setUniform('img', this.distorter.field.field);
     fieldShader2.setUniform('imgResolution', [this.forceLayer.width, this.forceLayer.height]);
     fieldShader2.setUniform('forceDimensions', [this.distorter.field.cols, this.distorter.field.rows]);
-    fieldShader2.setUniform('forceModifier', forceShaderModifier  * .1);
+    fieldShader2.setUniform('forceModifier', forceShaderModifier  * .5);
     fieldShader2.setUniform('forces', this.distorter.field.field);
 
     this.forceLayer.noStroke();
@@ -170,6 +191,9 @@ class DragDistorter {
     const center = createVector(floor(mouseX / width * this.field.cols), floor(mouseY / height * this.field.rows));
 
     pts.forEach(({row, col}) => {
+      if (random() > this.opts.brushDensity) {
+        return;
+      }
       const d = min(dist(center.x, center.y, col, row), maxD);
       const dM = max(.001, pow(maxD - d, .2));
 

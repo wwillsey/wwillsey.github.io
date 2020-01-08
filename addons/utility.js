@@ -120,11 +120,11 @@ function lerpColors(colors, v) {
   return lerpColor(col1, col2, indx - floor(indx));
 }
 
-Dw.EasyCam.prototype.apply = function(n) {
-  var o = this.cam;
-  n = n || o.renderer,
-  n && (this.camEYE = this.getPosition(this.camEYE), this.camLAT = this.getCenter(this.camLAT), this.camRUP = this.getUpVector(this.camRUP), n._curCamera.camera(this.camEYE[0], this.camEYE[1], this.camEYE[2], this.camLAT[0], this.camLAT[1], this.camLAT[2], this.camRUP[0], this.camRUP[1], this.camRUP[2]))
-};
+// Dw.EasyCam.prototype.apply = function(n) {
+//   var o = this.cam;
+//   n = n || o.renderer,
+//   n && (this.camEYE = this.getPosition(this.camEYE), this.camLAT = this.getCenter(this.camLAT), this.camRUP = this.getUpVector(this.camRUP), n._curCamera.camera(this.camEYE[0], this.camEYE[1], this.camEYE[2], this.camLAT[0], this.camLAT[1], this.camLAT[2], this.camRUP[0], this.camRUP[1], this.camRUP[2]))
+// };
 
 
 class TinyQueue {
@@ -250,4 +250,23 @@ function intersect(x1, y1, x2, y2, x3, y3, x4, y4) {
 	let y = y1 + ua * (y2 - y1)
 
 	return {x, y}
+}
+
+
+class GUI {
+  constructor() {
+    this.gui = new dat.GUI();
+  }
+
+  add(name, defaultVal, ...args) {
+    print(name, defaultVal, ...args);
+    this[name] = defaultVal;
+    this.gui.add(this, name, ...args)
+  }
+
+  addColor(name, defaultVal, ...args) {
+    print(name, defaultVal, ...args);
+    this[name] = defaultVal;
+    this.gui.addColor(this, name);
+  }
 }

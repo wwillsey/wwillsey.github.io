@@ -147,6 +147,10 @@ class Flowy {
     this.state.acc.rotate((n < .5 ? PI/10 : -PI/10) * n2)
     this.state.acc.add(0,0).limit(this.opts.radius * 1000);
     this.state.vel.add(this.state.acc).limit(this.opts.radius * 10);
+
+    this.state.vel.x = this.state.vel.x - this.state.vel.x % PI/4;
+    this.state.vel.y = this.state.vel.y - this.state.vel.y % PI/4;
+
     this.state.pos.add(this.state.vel);
   }
 }
