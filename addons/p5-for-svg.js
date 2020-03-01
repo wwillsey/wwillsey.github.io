@@ -5252,7 +5252,7 @@ exports.sizeOf = sizeOf;
 
     function timedOut() {
       self._timedOut = true
-      self.request.abort()      
+      self.request.abort()
     }
 
     function error(resp, msg, t) {
@@ -12312,12 +12312,11 @@ if (window.console && console.log) {
   // simulate synchronous behavior. This is a hack and is gross.
   // Since this will not work on all objects, particularly circular
   // structures, simply console.log() on error.
-  p5.prototype.print = function(args) {
-    try {
-      var newArgs = JSON.parse(JSON.stringify(args));
-      console.log(newArgs);
-    } catch(err) {
-      console.log(args);
+  p5.prototype.print = function() {
+    if (!arguments.length) {
+      _windowPrint();
+    } else {
+      console.log.apply(console, arguments);
     }
   };
 } else {
@@ -21368,29 +21367,180 @@ p5.prototype.endRecord  = function() {
 
 };
 
-p5.PrintWriter = function(filename, extension) {
-  var self = this;
-  this.name = filename;
-  this.content = '';
-  this.print = function(data) { this.content += data; };
-  this.println = function(data) { this.content += data + '\n'; };
-  this.flush = function() { this.content = ''; };
-  this.close = function() {
-    // convert String to Array for the writeFile Blob
-    var arr = [];
-    arr.push(this.content);
-    p5.prototype.writeFile(arr, filename, extension);
-    // remove from _pWriters array and delete self
-    for (var i in p5.prototype._pWriters) {
-      if (p5.prototype._pWriters[i].name === this.name) {
-        // remove from _pWriters array
-        p5.prototype._pWriters.splice(i, 1);
+// p5.PrintWriter = function(filename, extension) {
+//   var self = this;
+//   this.name = filename;
+//   this.content = '';
+//   this.print = function(data) { this.content += data; };
+//   this.println = function(data) { this.content += data + '\n'; };
+//   this.flush = function() { this.content = ''; };
+//   this.close = function() {
+//     // convert String to Array for the writeFile Blob
+//     var arr = [];
+//     arr.push(this.content);
+//     p5.prototype.writeFile(arr, filename, extension);
+//     // remove from _pWriters array and delete self
+//     for (var i in p5.prototype._pWriters) {
+//       if (p5.prototype._pWriters[i].name === this.name) {
+//         // remove from _pWriters array
+//         p5.prototype._pWriters.splice(i, 1);
+//       }
+//     }
+//     self.flush();
+//     self = {};
+//   };
+// };
+
+/**
+ *  @class p5.PrintWriter
+ *  @param  {String}     filename
+ *  @param  {String}     [extension]
+ */
+  p5.PrintWriter = function(filename, extension) {
+    var self = this;
+    this.name = filename;
+    this.content = '';
+    //Changed to write because it was being overloaded by function below.
+    /**
+     * Writes data to the PrintWriter stream
+     * @method write
+     * @param {Array} data all data to be written by the PrintWriter
+     * @example
+     * <div class="norender notest">
+     * <code>
+     * // creates a file called 'newFile.txt'
+     * let writer = createWriter('newFile.txt');
+     * // write 'Hello world!'' to the file
+     * writer.write(['Hello world!']);
+     * // close the PrintWriter and save the file
+     * writer.close();
+     * </code>
+     * </div>
+     * <div class='norender notest'>
+     * <code>
+     * // creates a file called 'newFile2.txt'
+     * let writer = createWriter('newFile2.txt');
+     * // write 'apples,bananas,123' to the file
+     * writer.write(['apples', 'bananas', 123]);
+     * // close the PrintWriter and save the file
+     * writer.close();
+     * </code>
+     * </div>
+     * <div class='norender notest'>
+     * <code>
+     * // creates a file called 'newFile3.txt'
+     * let writer = createWriter('newFile3.txt');
+     * // write 'My name is: Teddy' to the file
+     * writer.write('My name is:');
+     * writer.write(' Teddy');
+     * // close the PrintWriter and save the file
+     * writer.close();
+     * </code>
+     * </div>
+     */
+    this.write = function(data) {
+      this.content += data;
+    };
+    /**
+     * Writes data to the PrintWriter stream, and adds a new line at the end
+     * @method print
+     * @param {Array} data all data to be printed by the PrintWriter
+     * @example
+     * <div class='norender notest'>
+     * <code>
+     * // creates a file called 'newFile.txt'
+     * let writer = createWriter('newFile.txt');
+     * // creates a file containing
+     * //  My name is:
+     * //  Teddy
+     * writer.print('My name is:');
+     * writer.print('Teddy');
+     * // close the PrintWriter and save the file
+     * writer.close();
+     * </code>
+     * </div>
+     * <div class='norender notest'>
+     * <code>
+     * let writer;
+     *
+     * function setup() {
+     *   createCanvas(400, 400);
+     *   // create a PrintWriter
+     *   writer = createWriter('newFile.txt');
+     * }
+     *
+     * function draw() {
+     *   // print all mouseX and mouseY coordinates to the stream
+     *   writer.print([mouseX, mouseY]);
+     * }
+     *
+     * function mouseClicked() {
+     *   // close the PrintWriter and save the file
+     *   writer.close();
+     * }
+     * </code>
+     * </div>
+     */
+    this.print = function(data) {
+      this.content += data + '\n';
+    };
+    /**
+     * Clears the data already written to the PrintWriter object
+     * @method clear
+     * @example
+     * <div class ="norender notest"><code>
+     * // create writer object
+     * let writer = createWriter('newFile.txt');
+     * writer.write(['clear me']);
+     * // clear writer object here
+     * writer.clear();
+     * // close writer
+     * writer.close();
+     * </code></div>
+     *
+     */
+    this.clear = function() {
+      this.content = '';
+    };
+    /**
+     * Closes the PrintWriter
+     * @method close
+     * @example
+     * <div class="norender notest">
+     * <code>
+     * // create a file called 'newFile.txt'
+     * let writer = createWriter('newFile.txt');
+     * // close the PrintWriter and save the file
+     * writer.close();
+     * </code>
+     * </div>
+     * <div class='norender notest'>
+     * <code>
+     * // create a file called 'newFile2.txt'
+     * let writer = createWriter('newFile2.txt');
+     * // write some data to the file
+     * writer.write([100, 101, 102]);
+     * // close the PrintWriter and save the file
+     * writer.close();
+     * </code>
+     * </div>
+     */
+    this.close = function() {
+      // convert String to Array for the writeFile Blob
+      var arr = [];
+      arr.push(this.content);
+      p5.prototype.writeFile(arr, filename, extension);
+      // remove from _pWriters array and delete self
+      for (var i in p5.prototype._pWriters) {
+        if (p5.prototype._pWriters[i].name === this.name) {
+          // remove from _pWriters array
+          p5.prototype._pWriters.splice(i, 1);
+        }
       }
-    }
-    self.flush();
-    self = {};
+      self.clear();
+      self = {};
+    };
   };
-};
 
 p5.prototype.saveBytes = function() {
   // TODO
@@ -21775,7 +21925,7 @@ p5.prototype.writeFile = function(dataToDownload, filename, extension) {
   if (p5.prototype._isSafari() ) {
     type = 'text\/plain';
   }
-  var blob = new Blob(dataToDownload, {'type': type});
+  var blob = new Blob(dataToDownload, {'type': 'image/octet-stream'});
   var href = window.URL.createObjectURL(blob);
   p5.prototype.downloadFile(href, filename, extension);
 };
@@ -21790,30 +21940,64 @@ p5.prototype.writeFile = function(dataToDownload, filename, extension) {
  *  @param  {[String]} filename
  *  @param  {[String]} extension
  */
-p5.prototype.downloadFile = function(href, fName, extension) {
+// p5.prototype.downloadFile = function(href, fName, extension) {
+//   var fx = _checkFileExtension(fName, extension);
+//   var filename = fx[0];
+//   var ext = fx[1];
+
+//   var a = document.createElement('a');
+//   a.href = href;
+//   a.download = filename;
+
+//   // Firefox requires the link to be added to the DOM before click()
+//   a.onclick = destroyClickedElement;
+//   a.style.display = 'none';
+//   document.body.appendChild(a);
+//   // print(a);
+
+//   // Safari will open this file in the same page as a confusing Blob.
+//   if (p5.prototype._isSafari() ) {
+//     var aText = 'Hello, Safari user! To download this file...\n';
+//     aText += '1. Go to File --> Save As.\n';
+//     aText += '2. Choose "Page Source" as the Format.\n';
+//     aText += '3. Name it with this extension: .\"' + ext+'\"';
+//     alert(aText);
+//   }
+//   a.click();
+//   href = null;
+// };
+p5.prototype.downloadFile = function(data, fName, extension) {
   var fx = _checkFileExtension(fName, extension);
   var filename = fx[0];
-  var ext = fx[1];
+
+  if (data instanceof Blob) {
+    var fileSaver = _dereq_('file-saver');
+    fileSaver.saveAs(data, filename);
+    return;
+  }
 
   var a = document.createElement('a');
-  a.href = href;
+  a.href = data;
   a.download = filename;
 
   // Firefox requires the link to be added to the DOM before click()
-  a.onclick = destroyClickedElement;
+  a.onclick = function(e) {
+    destroyClickedElement(e);
+    e.stopPropagation();
+  };
+
   a.style.display = 'none';
   document.body.appendChild(a);
 
   // Safari will open this file in the same page as a confusing Blob.
-  if (p5.prototype._isSafari() ) {
+  if (p5.prototype._isSafari()) {
     var aText = 'Hello, Safari user! To download this file...\n';
     aText += '1. Go to File --> Save As.\n';
     aText += '2. Choose "Page Source" as the Format.\n';
-    aText += '3. Name it with this extension: .\"' + ext+'\"';
+    aText += '3. Name it with this extension: ."' + fx[1] + '"';
     alert(aText);
   }
   a.click();
-  href = null;
 };
 
 /**

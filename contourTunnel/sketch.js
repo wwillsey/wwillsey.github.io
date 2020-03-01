@@ -43,7 +43,7 @@ function draw() {
   spectrum = fft.analyze(64);
   const shadowOffset = createVector((mouseX - width / 2) / 3, (mouseY - height / 2)/3 );
   // fill(random(255))
-  const n = 25;
+  const n = 10;
   const startCol = color(...gui.color1);
   const endColor = color(...gui.color2);
   for(let i = 0; i < n; i++) {

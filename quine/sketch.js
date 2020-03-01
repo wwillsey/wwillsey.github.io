@@ -15,13 +15,19 @@ function keyPressed() {
 
 function setup() {
   createCanvas(displayWidth, displayHeight, SVG);
-  background(255);
-  fill(150);
-  stroke(150);
+
+  // (function f() {
+  //   //hello
+
+  //   const srcCode = '(' + f.toString() + ')();';
+  //   print(srcCode)
+
+  //   print(this.setup)
+  // })();
+
+  drawThis();
 }
 
-function draw() {
-  var r = mouseX;
-  background(255);
-  ellipse(0, 0, r, r);
+function drawThis() {
+  text(drawThis.toString(), 10, 10);
 }

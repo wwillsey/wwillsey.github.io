@@ -10,7 +10,7 @@ function preload() {
   print('preload')
   // img = loadImage('https://upload.wikimedia.org/wikipedia/commons/5/52/Electricsheep-3404.jpg');
   // img = loadImage('https://i.pinimg.com/736x/bd/eb/10/bdeb10474d1d6e6c2d15ad7dcbe568a9.jpg');
-  img = loadImage('http://localhost:3000/media/IMG_3968.JPG');
+  img = loadImage('./starry.jpg');
 }
 
 function keyPressed() {
@@ -20,7 +20,7 @@ function keyPressed() {
       remove()
       break;
     case SHIFT:
-      saveCanvas('myCanvas', 'jpg');
+      save();
       break
   }
 
@@ -39,7 +39,7 @@ function setup() {
   img.resize(displayWidth,0);
 
   img.loadPixels();
-  createCanvas(img.width, img.height);
+  createCanvas(img.width, img.height, SVG);
 
   gui = new GUI();
   gui.add('strokeWeight', 1, 0, 10);

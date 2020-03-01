@@ -261,12 +261,148 @@ class GUI {
   add(name, defaultVal, ...args) {
     print(name, defaultVal, ...args);
     this[name] = defaultVal;
-    this.gui.add(this, name, ...args)
+    return this.gui.add(this, name, ...args);
   }
 
   addColor(name, defaultVal, ...args) {
     print(name, defaultVal, ...args);
     this[name] = defaultVal;
     this.gui.addColor(this, name);
+  }
+}
+
+function imageCopy(img) {
+  const res = createImage(img.width, img.height);
+  res.loadPixels();
+  res.copy(img, 0,0,img.width, img.height, 0,0,img.width,img.height);
+  return res;
+}
+
+
+class LineReducer {
+  constructor(opts) {
+    this.opts = opts;
+    this.lines = {};
+    this.rawSize = 0;
+    this.reducedSize = 0;
+    this.linesBefore = [];
+  }
+
+  getKey(x1,y1,x2,y2) {
+    const {m,x,y} = Line.ptsToMB({x: x1, y: y1}, {x:x2, y:y2});
+    return `${m.toFixed(this.opts.nFixed)}:${x.toFixed(this.opts.nFixed)}:${y.toFixed(this.opts.nFixed)}`;
+  }
+
+
+
+  add(a,b,c,d) {
+    this.rawSize++;
+    let x1,x2,y1,y2;
+    if(c == undefined && d == undefined) {
+      x1 = a.x;
+      y1 = a.y;
+      x2 = b.x;
+      y2 = b.y;
+    } else {
+      x1 = a;
+      y1 = b;
+      x2 = c;
+      y2 = d;
+    }
+
+    x1 = x1 - x1 % this.opts.modBy;
+    x2 = x2 - x2 % this.opts.modBy;
+    y2 = y2 - y2 % this.opts.modBy;
+    y1 = y1 - y1 % this.opts.modBy;
+
+    if(x1 > x2) {
+      const tx = x1;
+      x1 = x2;
+      x2 = tx;
+      const ty = y1;
+      y1 = y2;
+      y2 = ty;
+    } else if (x1 == x2 && y1 > y2) {
+      const ty = y1;
+      y1 = y2;
+      y2 = ty;
+    }
+    this.linesBefore.push([x1,y1,x2,y2]);
+
+  }
+
+  reduceOne(x1, y1, x2, y2) {
+    // print('reduce one', x1, y1, x2, y2)
+    const key = this.getKey(x1, y1, x2, y2);
+
+    if (this.lines[key] === undefined) {
+      this.lines[key] = [];
+    }
+    let added = false;
+    this.lines[key].forEach(({p1, p2}) => {
+      // print('considering ', {p1,p2})
+      if (p1.x == p2.x) {
+        if (y1 >= p1.y && y1 <= p2.y) {
+          p2.y = max(y2, p2.y);
+          added = true;
+        } else if (y2 >= p1.y && y2 <= p2.y) {
+          p1.y = min(y1, p1.y);
+          added = true;
+        }
+      } else {
+        if (x1 >= p1.x && x1 <= p2.x) {
+          p2.x = max(x2, p2.x);
+          added = true;
+        } else if (x2 >= p1.x && x2 <= p2.x) {
+          p1.x = min(x1, p1.x);
+          added = true;
+        }
+      }
+    })
+    if (!added) {
+      this.lines[key].push({p1:{x: x1, y: y1}, p2: {x: x2, y:y2}});
+      this.reducedSize++;
+    }
+  }
+
+  reduce() {
+    this.linesBefore.sort()
+    // print(this.linesBefore)
+    this.linesBefore.forEach(([x1, y1, x2, y2]) => this.reduceOne(x1, y1, x2, y2));
+    print(this.lines)
+
+  }
+
+  render() {
+    Object.keys(this.lines).forEach(k => this.lines[k].forEach(({p1, p2}) => {
+      stroke(0)
+      line(p1.x, p1.y, p2.x, p2.y)
+      stroke(color(255,0,0,100))
+      ellipse(p1.x,p1.y,3,3)
+      stroke(color(0,0,255,100))
+
+      ellipse(p2.x,p2.y,3,3)
+
+      // print(p1.x, p1.y, p2.x, p2.y)
+    }
+    ));
+    print(`rendered ${this.reducedSize} lines instead of ${this.rawSize}`);
+  }
+}
+
+function normalVal(v) {
+  if (abs(v) == v || abs(v) == Infinity) {
+    return abs(v);
+  }
+  return v;
+}
+class Line {
+  static ptsToMB(p1, p2) {
+    let m = (p2.y - p1.y) / (p2.x - p1.x);
+    m = abs(m) == m || abs(m) == Infinity ? abs(m) : m;
+    const y = p1.y - m * p1.x;
+    const x = m == Infinity ? p1.x : -y / m;
+
+    return {m, y: normalVal(y), x: normalVal(x)}
   }
 }

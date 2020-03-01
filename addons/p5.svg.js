@@ -1861,6 +1861,7 @@ module.exports = function(p5) {
         var args = arguments;
         args = [args[0], args[1], args[2]];
 
+        print('saving svg', args);
         var svg;
 
         if (args[0] instanceof p5.Graphics) {
@@ -1887,7 +1888,16 @@ module.exports = function(p5) {
             filename: filename,
             extension: ext,
             callback: function(err, frame) {
-                p.downloadFile(frame.imageData, frame.filename, frame.ext);
+                if (err) {
+                    print('error!', err);
+                }
+                try {
+                    let writer = p.createWriter(`${frame.filename}.${frame.ext}`);
+                    writer.write(new XMLSerializer().serializeToString(svg));
+                    writer.close();
+                } catch (err) {
+                    print('error downloading : ', err);
+                }
             }
         });
     };
@@ -1971,6 +1981,7 @@ module.exports = function(p5) {
     var _save = p5.prototype.save;
     p5.prototype.save = function() {
         var args = arguments;
+        print('args start', args);
         args = [args[0], args[1]];
 
         var svg;

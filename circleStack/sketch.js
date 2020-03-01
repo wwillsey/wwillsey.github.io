@@ -3,7 +3,7 @@
 let speed = .0001;
 let circles;
 
-let n = 20;
+let n = 25;
 let firstSize = 400;
 
 let E;
@@ -11,16 +11,24 @@ let E;
 let time = 0;
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
+  createCanvas(1200, 900, SVG);
 
   E = new p5.Ease();
 
   circles = new CircleStack(n, offsetFn, angleFn);
+  blendMode(REPLACE)
+}
+
+function keyPressed() {
+  if(keyCode === ENTER) {
+    save();
+  }
 }
 
 function draw() {
   handleKeys()
-  background(241, 225, 197);
+  // background(241, 225, 197);
+  background(0,0)
   circles.render();
 
   time += speed;
@@ -46,7 +54,7 @@ function handleKeys() {
 }
 
 function offsetFn(i) {
-  return (n - i) * 10;
+  return (n - i) * 7;
 }
 
 
@@ -74,12 +82,13 @@ class CircleStack {
     const col = getCol(i);
 
     // noStroke();
-    strokeWeight(.5)
+    stroke(0);
+    strokeWeight(1)
     fill(col);
 
 
     const size = firstSize - firstSize * E.iterativeSquareRoot(i / n);
-    circle(center.x, center.y, size);
+    ellipse(center.x, center.y, size, size);
   }
 
   render() {

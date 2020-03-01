@@ -10,9 +10,10 @@ let xResolution = 1000;
 let yResolution = 1000;
 
 const programLength = 50;
-const mutateBy = 2;
+const mutateBy = 5;
 
 const useMusic = true;
+const useMic = true;
 const useBackgroundImage = false;
 const useBackgroundVideo = false;
 const useCamera = false;
@@ -97,6 +98,9 @@ function keyPressed(){
   switch (keyCode) {
     case ENTER:
       cull();
+      break;
+    case SHIFT:
+      gui.toggleMaximize();
       // time = 0;
       // redraw();
   }
@@ -108,7 +112,7 @@ function keyPressed(){
 }
 
 function toggleMusic() {
-  if (useMusic) music.isPlaying() ? music.pause() : music.play();
+  if (useMusic && !useMic) music.isPlaying() ? music.pause() : music.play();
 }
 
 function selectAtMouse() {
@@ -128,12 +132,19 @@ function mousePressed() {
 function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(displayWidth-200, displayHeight, WEBGL);
+  createCanvas(displayWidth, displayHeight, WEBGL);
+  xResolution = width ;
+  yResolution = height;
   shaderLayer = createGraphics(width, height, WEBGL);
   if (useBackgroundVideo) {
     backgroundVideo = createVideo('../media/twistedhall.mov');
     backgroundVideo.loop();
     backgroundVideo.hide();
+  }
+
+  if (useMic) {
+    music = new p5.AudioIn();
+    music.start();
   }
 
 
@@ -199,6 +210,8 @@ function draw() {
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
   geneticShader.setUniform('musicAmplitude', amp);
+  geneticShader.setUniform('mouseX', mouseX / width)
+  geneticShader.setUniform('mouseY', mouseY / height)
   if (backgroundVideo)
     geneticShader.setUniform('backgroundImage', backgroundVideo);
   else if (cam)
@@ -241,6 +254,8 @@ function generateShader(containers) {
   uniform sampler2D backgroundImage;
   uniform float energies[4];
   uniform float musicCentroid;
+  uniform float mouseX;
+  uniform float mouseY;
 
 
   const float dist = 1.0;
@@ -567,9 +582,12 @@ class geneticGUI {
     addButton('toggleMusic');
     addButton('toggleMaximize');
 
-    this.addValue('mutateBy', mutateBy, 0, 100);
-    this.addValue('mutateChance', .5, 0, 1);
-    this.addValue('mergeNtimes', 1, 0, 10);
+    this.addValue('mutateBy', mutateBy, 0, 100, 1);
+    this.addValue('mutateChance', .7, 0, 1);
+    this.addValue('mergeNtimes', 2, 0, 10, 1);
+    this.addValue('xResolutionScale', 1, 0, 10);
+    this.addValue('yResolutionScale', 1, 0, 10);
+
   }
 
   addValue(name, defaultVal, start, end) {
@@ -617,6 +635,15 @@ class geneticGUI {
 
     selected.forEach(container => container.toggleSelection());
     if (needUpdate) {
+      if (isMaximized) {
+        xResolution /= this.xResolutionScale
+        yResolution /= this.yResolutionScale
+        cursor();
+      } else {
+        xResolution *= this.xResolutionScale
+        yResolution *= this.yResolutionScale
+        noCursor();
+      }
       isMaximized = ! isMaximized;
       updateShader();
     }
