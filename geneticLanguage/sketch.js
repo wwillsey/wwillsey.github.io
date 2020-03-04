@@ -3,8 +3,8 @@ let containers;
 let fft;
 let gui;
 
-let rows = 4;
-let cols = 5;
+let rows = 3;
+let cols = 4;
 
 let xResolution = 1000;
 let yResolution = 1000;
@@ -32,7 +32,7 @@ let amplitude;
 let maximizeState = {};
 let isMaximized = false;
 
-const operators = [
+let operators = [
   '+',
   '-',
   'sin',
@@ -52,8 +52,10 @@ const operators = [
   'getAudioEnergy',
   'max',
   'min',
+  'exp',
+  'log'
 ];
-const symbols = [
+let symbols = [
   'x',
   'y',
   'mouseX',
@@ -133,18 +135,25 @@ function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
   createCanvas(displayWidth, displayHeight, WEBGL);
-  xResolution = width ;
+  xResolution = width;
   yResolution = height;
   shaderLayer = createGraphics(width, height, WEBGL);
   if (useBackgroundVideo) {
-    backgroundVideo = createVideo('../media/twistedhall.mov');
-    backgroundVideo.loop();
-    backgroundVideo.hide();
+    backgroundVideo = createVideo('../media/twistedhall.mov', () => {
+      backgroundVideo.loop();
+      backgroundVideo.hide();
+    })
+
   }
 
   if (useMic) {
     music = new p5.AudioIn();
     music.start();
+  }
+
+  if(!(useBackgroundImage || useBackgroundVideo || useCamera)) {
+    symbols = symbols.filter(k => !k.includes("Image"));
+    operators = operators.filter(k => !k.includes("Background"));
   }
 
 
@@ -304,6 +313,11 @@ function generateShader(containers) {
       n[8] = texture2D(tex, coord + vec2(  w, h));
     }
 
+  vec3 hsv2rgb(vec3 c) {
+    vec4 K = vec4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+    vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
+    return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
+  }
 
 
 
@@ -531,6 +545,8 @@ class Container {
         case 'mod': push(`mod(${pop()}, ${pop()})`); break;
         case 'max': push(`max(${pop()}, ${pop()})`); break;
         case 'min': push(`min(${pop()}, ${pop()})`); break;
+        case 'exp': push(`exp(${pop()})`); break;
+        case 'log': push(`log(${pop()})`); break;
         default:
           // push(env[val] != undefined ? env[val] : val);
           push(val)
