@@ -3,23 +3,26 @@ let containers;
 let fft;
 let gui;
 
-let rows = 3;
+let rows = 4;
 let cols = 4;
 
-let xResolution = 1000;
-let yResolution = 1000;
+let xResolution;
+let yResolution;
 
-const programLength = 50;
+const programLength = 20;
 const mutateBy = 5;
 
-const useMusic = true;
+const useMusic = false;
 const useMic = true;
-const useBackgroundImage = false;
+const useBackgroundImage = true;
 const useBackgroundVideo = false;
 const useCamera = false;
 let backgroundImage;
 let backgroundVideo;
 let cam;
+
+
+let recorder;
 
 const fftEnergies = 10;
 
@@ -28,7 +31,7 @@ let time = 0;
 let geneticShader;
 let music;
 let amplitude;
-
+let mousePos = {x: 0, y: 0};
 let maximizeState = {};
 let isMaximized = false;
 
@@ -89,7 +92,7 @@ void main() {
 function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
-  backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/curve/starry.jpg') : null;
+  backgroundImage = useBackgroundImage ? loadImage("../media/7525_22.jpg") : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
 
 }
@@ -97,6 +100,7 @@ function preload() {
 
 
 function keyPressed(){
+  print('key pressed', keyCode, key)
   switch (keyCode) {
     case ENTER:
       cull();
@@ -105,6 +109,13 @@ function keyPressed(){
       gui.toggleMaximize();
       // time = 0;
       // redraw();
+      break;
+    case ALT:
+      recorder.toggle();
+      break;
+    case 93:
+      saveCanvas();
+      break;
   }
   switch (key) {
     case ' ':
@@ -135,13 +146,23 @@ function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
   createCanvas(displayWidth, displayHeight, WEBGL);
-  xResolution = width;
-  yResolution = height;
+  recorder = new ScreenRecorder({
+    framerate: 10,
+  });
+  xResolution = width / cols;
+  yResolution = height / rows;
   shaderLayer = createGraphics(width, height, WEBGL);
   if (useBackgroundVideo) {
-    backgroundVideo = createVideo('../media/twistedhall.mov', () => {
+    backgroundVideo = createVideo('./videos/breath_ctrl (loop).mp4', () => {
       backgroundVideo.loop();
-      backgroundVideo.hide();
+      // backgroundVideo.hide();
+      backgroundVideo.elt.muted = false
+      backgroundVideo.size(width,height);
+      music = backgroundVideo;
+      setTimeout(() => {
+        backgroundVideo.play()
+        backgroundVideo.isReady = true;
+      }, 1000);
     })
 
   }
@@ -206,6 +227,13 @@ function draw() {
   let spectrum = fft.analyze();
   shaderLayer.shader(geneticShader);
 
+  if(isMaximized) {
+    mousePos.x += movedX;
+    mousePos.y += movedY;
+  } else {
+    mousePos.x = mouseX;
+    mousePos.y = mouseY;
+  }
   // time += 0.01;
 
   const amp = amplitude.getLevel() || 0;
@@ -219,9 +247,9 @@ function draw() {
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
   geneticShader.setUniform('musicAmplitude', amp);
-  geneticShader.setUniform('mouseX', mouseX / width)
-  geneticShader.setUniform('mouseY', mouseY / height)
-  if (backgroundVideo)
+  geneticShader.setUniform('mouseX', mousePos.x / width)
+  geneticShader.setUniform('mouseY', mousePos.y / height)
+  if (backgroundVideo && backgroundVideo.isReady)
     geneticShader.setUniform('backgroundImage', backgroundVideo);
   else if (cam)
     geneticShader.setUniform('backgroundImage', cam);
@@ -245,6 +273,7 @@ function draw() {
 
   getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
   pop();
+  recorder.takeFrame();
 }
 
 
@@ -560,9 +589,9 @@ class Container {
       ${Array.from({length: maxi}, (v, i) => `float x_${this.id}_${i}`).join(';\n')};
       ${result}
 
-      col = vec3(${pop()} * 255.0, ${pop()} * 255.0, ${pop()} * 255.0) * r;
+      ${shuffle([`float R = ${pop()};`, `float G = ${pop()};`, `float B = ${pop()};`]).join("\n")}
+      col = r * vec3(R * 255.0, G * 255.0, B * 255.0);
 
-      // col = vec3(x, y, 0.0);
       scene = mix(scene, col, col);
     }
     `;
@@ -601,8 +630,8 @@ class geneticGUI {
     this.addValue('mutateBy', mutateBy, 0, 100, 1);
     this.addValue('mutateChance', .7, 0, 1);
     this.addValue('mergeNtimes', 2, 0, 10, 1);
-    this.addValue('xResolutionScale', 1, 0, 10);
-    this.addValue('yResolutionScale', 1, 0, 10);
+    this.addValue('xResolutionScale', cols, 0, 10);
+    this.addValue('yResolutionScale', rows, 0, 10);
 
   }
 
@@ -639,12 +668,14 @@ class geneticGUI {
       rows = 1;
       cols = 1;
       needUpdate = true;
+      requestPointerLock();
     } else if (isMaximized) {
       maximizeState.container.row = maximizeState.row;
       maximizeState.container.col = maximizeState.col;
       rows = maximizeState.rows;
       cols = maximizeState.cols;
       needUpdate = true;
+      exitPointerLock();
     }
 
     // print(maximizeState);

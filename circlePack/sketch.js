@@ -9,6 +9,7 @@ let BUFFER;
 
 let img;
 
+
 function preload() {
   img = loadImage('http://localhost:3000/curve/starry.jpg');
 }
@@ -21,17 +22,21 @@ function keyPressed() {
     case SHIFT:
       const res = pack.addRandom(10, 100)
       break
+    case ALT:
+      saveSvg('out', false);
+      break;
   }
 }
+
 function setup() {
   is3D = false;
   BUFFER = 0;
 
-  createCanvas(1920, 1080, is3D ? WEBGL : undefined);
-  cam = createEasyCam();
+  createCanvas(1920, 1080, SVG)//is3D ? WEBGL : undefined);
+  // cam = createEasyCam();
   E = new p5.Ease();
   randomSeed(1);
-  ellipseMode(CENTER);
+  // ellipseMode(CENTER);
   rectMode(CORNERS);
   // frameRate(10)
   pack = new Pack();
@@ -75,19 +80,20 @@ function draw() {
 
   pack.head = null;
   pack.fillWithSizes([
-    // [300, 1],
-    // [150, 1],
-    // [100, 20],
+    [150, 5000],
+    [100, 5000],
+    [50, 5000],
+    // [50, 2000],
     // [75, 100],
     // [50, 500],
     // [20, 500],
-    [10, 500],
-    [3, 5000],
+    // [10, 500],
+    // [3, 5000],
     // [2, 500]
   ]);
   if (pack.head)
   pack.head.render(pack.radius);
-  fill(255);
+  fill(0);
   text(frameRate(), 10, 10)
   noLoop()
   // noLoop();
@@ -209,9 +215,9 @@ class PackNode {
       sphere(this.radius);
       pop();
     } else {
-      noStroke();
-      fill(this.color)
-      ellipse(this.pos.x, this.pos.y, this.radius * 2)
+      // noStroke();
+      // fill(red(this.color), green(this.color), blue(this.color));
+      ellipse(this.pos.x, this.pos.y, this.radius * 2, this.radius * 2)
 
     }
     // fill(0)
@@ -266,13 +272,13 @@ class Pack {
   fillWithSizes(balls) {
     balls.forEach(([radius, attempts]) => {
       print(radius, attempts);
-      while(this.addRandom(abs(randomGaussian(radius, radius / 2)), attempts || 100));
+      while(this.addRandom(abs(randomGaussian(radius, radius / 200)), attempts || 100));
     })
   }
 }
 
-Dw.EasyCam.prototype.apply = function(n) {
-  var o = this.cam;
-  n = n || o.renderer,
-  n && (this.camEYE = this.getPosition(this.camEYE), this.camLAT = this.getCenter(this.camLAT), this.camRUP = this.getUpVector(this.camRUP), n._curCamera.camera(this.camEYE[0], this.camEYE[1], this.camEYE[2], this.camLAT[0], this.camLAT[1], this.camLAT[2], this.camRUP[0], this.camRUP[1], this.camRUP[2]))
-};
+// Dw.EasyCam.prototype.apply = function(n) {
+//   var o = this.cam;
+//   n = n || o.renderer,
+//   n && (this.camEYE = this.getPosition(this.camEYE), this.camLAT = this.getCenter(this.camLAT), this.camRUP = this.getUpVector(this.camRUP), n._curCamera.camera(this.camEYE[0], this.camEYE[1], this.camEYE[2], this.camLAT[0], this.camLAT[1], this.camLAT[2], this.camRUP[0], this.camRUP[1], this.camRUP[2]))
+// };

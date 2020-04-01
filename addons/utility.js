@@ -286,14 +286,24 @@ class LineReducer {
     this.rawSize = 0;
     this.reducedSize = 0;
     this.linesBefore = [];
+    this.mult = 1000000;
+    this.epsilon = .01;
   }
 
   getKey(x1,y1,x2,y2) {
-    const {m,x,y} = Line.ptsToMB({x: x1, y: y1}, {x:x2, y:y2});
-    return `${m.toFixed(this.opts.nFixed)}:${x.toFixed(this.opts.nFixed)}:${y.toFixed(this.opts.nFixed)}`;
+    const {m,x,y} = Line.ptsToMB({x: this.toFloat(x1), y: this.toFloat(y1)}, {x: this.toFloat(x2), y: this.toFloat(y2)});
+    // return `${m.toFixed(this.opts.nFixed)}:${x.toFixed(this.opts.nFixed)}:${y.toFixed(this.opts.nFixed)}`;
+    return [this.toInt(x),this.toInt(y)];
   }
 
 
+  toInt(n) {
+    return floor(n * this.mult);
+  }
+
+  toFloat(n) {
+    return n / this.mult;
+  }
 
   add(a,b,c,d) {
     this.rawSize++;
@@ -327,65 +337,112 @@ class LineReducer {
       y1 = y2;
       y2 = ty;
     }
-    this.linesBefore.push([x1,y1,x2,y2]);
 
+    this.linesBefore.push([x1,y1,x2,y2].map(i => this.toInt(i)));
+  }
+
+  get(compoundKey) {
+    let val = this.lines;
+    for(let i = 0; i < compoundKey.length; i++) {
+      val = val[compoundKey[i]];
+      if(val == undefined) {
+        return undefined;
+      }
+    }
+    return val;
+  }
+
+  push(compoundKey, value) {
+    let val = this.lines;
+
+    for(let i =0; i < compoundKey.length - 1; i++) {
+      if(val[compoundKey[i]] == undefined) {
+        val[compoundKey[i]] = {}
+      }
+      val = val[compoundKey[i]];
+    }
+
+    if(val[compoundKey[compoundKey.length - 1]] == undefined) {
+      val[compoundKey[compoundKey.length - 1]] = [value]
+    } else {
+      val[compoundKey[compoundKey.length - 1]].push(value)
+    }
+  }
+
+  leq(a,b) {
+    return a <= b || abs(a-b) < this.epsilon
+  }
+
+  eq(a,b) {
+    return a == b || abs(a-b) < this.epsilon;
+  }
+
+  geq(a,b) {
+    return a >= b || abs(a-b) < this.epsilon;
   }
 
   reduceOne(x1, y1, x2, y2) {
     // print('reduce one', x1, y1, x2, y2)
     const key = this.getKey(x1, y1, x2, y2);
 
-    if (this.lines[key] === undefined) {
-      this.lines[key] = [];
-    }
     let added = false;
-    this.lines[key].forEach(({p1, p2}) => {
+
+    const l = this.get(key) || [];
+    // print('l', l);
+    l.forEach(({p1, p2}) => {
       // print('considering ', {p1,p2})
-      if (p1.x == p2.x) {
-        if (y1 >= p1.y && y1 <= p2.y) {
+      if (this.eq(p1.x, p2.x)) {
+        if (this.geq(y1, p1.y) && this.leq(y1, p2.y)) {
           p2.y = max(y2, p2.y);
           added = true;
-        } else if (y2 >= p1.y && y2 <= p2.y) {
+        } else if (this.geq(y2, p1.y) && this.leq(y2, p2.y)) {
           p1.y = min(y1, p1.y);
           added = true;
         }
       } else {
-        if (x1 >= p1.x && x1 <= p2.x) {
+        if (this.geq(x1,p1.x) && this.leq(x1, p2.x)) {
           p2.x = max(x2, p2.x);
           added = true;
-        } else if (x2 >= p1.x && x2 <= p2.x) {
+        } else if (this.geq(x2, p1.x) && this.leq(x2, p2.x)) {
           p1.x = min(x1, p1.x);
           added = true;
         }
       }
     })
     if (!added) {
-      this.lines[key].push({p1:{x: x1, y: y1}, p2: {x: x2, y:y2}});
+      this.push(key, {p1:{x: x1, y: y1}, p2: {x: x2, y:y2}});
       this.reducedSize++;
     }
   }
 
   reduce() {
     this.linesBefore.sort()
-    // print(this.linesBefore)
+    // print('linesbefore', this.linesBefore)
     this.linesBefore.forEach(([x1, y1, x2, y2]) => this.reduceOne(x1, y1, x2, y2));
-    print(this.lines)
-
+    // print('lines', this.lines)
   }
 
   render() {
-    Object.keys(this.lines).forEach(k => this.lines[k].forEach(({p1, p2}) => {
-      stroke(0)
-      line(p1.x, p1.y, p2.x, p2.y)
-      stroke(color(255,0,0,100))
-      ellipse(p1.x,p1.y,3,3)
-      stroke(color(0,0,255,100))
+    Object.keys(this.lines).forEach(k1 =>
+      Object.keys(this.lines[k1]).forEach(k2 =>
+          this.lines[k1][k2].forEach(({p1, p2}) => {
+          stroke(0)
 
-      ellipse(p2.x,p2.y,3,3)
+          p1.x = this.toFloat(p1.x)
+          p1.y = this.toFloat(p1.y)
+          p2.x = this.toFloat(p2.x)
+          p2.y = this.toFloat(p2.y)
 
-      // print(p1.x, p1.y, p2.x, p2.y)
+          line(p1.x, p1.y, p2.x, p2.y);
+          // stroke(color(255,0,0,100))
+          // ellipse(p1.x,p1.y,3,3)
+          // stroke(color(0,0,255,100))
+
+          // ellipse(p2.x,p2.y,3,3)
+
+          // print(p1.x, p1.y, p2.x, p2.y)
     }
-    ));
+    )));
     print(`rendered ${this.reducedSize} lines instead of ${this.rawSize}`);
   }
 }
@@ -401,8 +458,71 @@ class Line {
     let m = (p2.y - p1.y) / (p2.x - p1.x);
     m = abs(m) == m || abs(m) == Infinity ? abs(m) : m;
     const y = p1.y - m * p1.x;
-    const x = m == Infinity ? p1.x : -y / m;
+    const x = m == Infinity ? p1.x : (m == 0 ? Infinity : -y / m);
 
     return {m, y: normalVal(y), x: normalVal(x)}
   }
+}
+
+class ScreenRecorder {
+  constructor(opts) {
+    this.opts = opts;
+    this.recording = false;
+  }
+
+  record() {
+    this.capturer = new CCapture({
+      format: 'webm',
+      framerate: 30,
+      ...this.opts
+    });
+    this.capturer.start();
+    this.recording = true;
+    this.frameCount = 0;
+    print(this.capturer);
+  }
+
+  takeFrame() {
+    if (this.recording) {
+      print('taking frame:', this.frameCount);
+      this.frameCount++;
+      const c = document.getElementById('defaultCanvas0');
+      this.capturer.capture(c);
+    }
+  }
+
+  save() {
+    this.capturer.stop();
+    this.capturer.save();
+    delete this.capturer;
+    this.recording = false;
+  }
+
+  toggle() {
+    this.recording ? this.save() : this.record()
+  }
+}
+
+
+let boundingBoxRemoved = false;
+function saveSvg(fileName, optimize = true, removeAtt = ["path", 'fill', "stroke", "paint-order", 'stroke-opacity', 'stroke-linecap', 'stroke-miterlimit']) {
+
+  if (optimize) {
+    const group = window.document.getElementsByTagName('g')[1]
+    removeAtt.forEach(att => {
+      if(group.children[0] && group.children[0].hasAttribute(att)) {
+        group.setAttribute(att, group.children[0].getAttribute(att))
+      }
+    })
+
+    for(let i = 0; i < group.children.length; i++) {
+      const attributes = group.children[i].attributes;
+      removeAtt.forEach(att => {
+        if(attributes.hasOwnProperty(att)) {
+          attributes.removeNamedItem(att)
+        }
+    });
+  }
+  }
+  save(fileName, 'svg');
 }

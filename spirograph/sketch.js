@@ -1,13 +1,11 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
-let S, gui,c;
+let S, gui;
 function keyPressed() {
   switch (keyCode) {
     case ALT:
       // save('out','svg');
       // S.render()
-      const svg = createGraphics(width, height, SVG);
-      S.render(gui.steps, svg);
-      svg.save('out', 'svg')
+      saveSvg('out')
       break;
     case SHIFT:
       noLoop();
@@ -18,8 +16,8 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
-  c = createGraphics(displayWidth, displayHeight)
+  createCanvas(displayWidth, displayHeight, SVG);
+  // c = createGraphics(displayWidth, displayHeight)
 
   // svg = new SvgSavable(c);
 
@@ -29,21 +27,24 @@ function setup() {
 
   gui = new GUI();
   gui.add('steps', 10, 0, 20000).onFinishChange(redraw);
-  gui.add('v0_mult', 1, 0, 1000).onChange(redraw);
+  gui.add('v0_mult', 1, 0, 1000,1).onChange(redraw);
   gui.add('v0_radius', 100, 0, 1000).onChange(redraw);
-  gui.add('v0_radiusMod', 0, -1000, 1000).onChange(redraw);
-  gui.add('v0_radiusFreq', 0, 0, 100).onChange(redraw);
+  gui.add('v0_radiusMod', 0, -10, 10).onChange(redraw);
+  gui.add('v0_radiusFreq', 0, 0, 100,1).onChange(redraw);
 
-  gui.add('v1_mult', 1, 0, 1000).onChange(redraw);
+  gui.add('v1_mult', 1, 0, 1000,1).onChange(redraw);
   gui.add('v1_radius', 100, 0, 1000).onChange(redraw);
-  gui.add('v1_radiusMod', 0, -1000, 1000).onChange(redraw);
-  gui.add('v1_radiusFreq', 0, 0, 100).onChange(redraw);
+  gui.add('v1_radiusMod', 0, -100, 100).onChange(redraw);
+  gui.add('v1_radiusFreq', 0, 0, 100,1).onChange(redraw);
 
 
   gui.add('v2_x', 0, -1000, 1000).onChange(redraw);
   gui.add('v2_y', 0, -1000, 1000).onChange(redraw);
-  gui.add('v3_noiseScale', .01, 0, .1).onChange(redraw);
-  gui.add('v3_noiseMult', 10, 0, 100).onChange(redraw);
+  gui.add('v3_noiseScale', .01, 0, 1, .001).onChange(redraw);
+  gui.add('v3_noiseMult', 0, 0, 10).onChange(redraw);
+  gui.add('f', 0, -1000, 1000, 1).onChange(redraw);
+  gui.add('minD', 0, 0, 100, 1).onChange(redraw);
+  gui.add('dPow', 0, 0, 10, .001).onChange(redraw);
 
   gui.add('ptsSimplify', 0, 0, 1).onChange(redraw);
 
@@ -54,23 +55,50 @@ function setup() {
 function draw() {
   noLoop();
   background(255);
+
   S = new Spirograph(
   [
     F.translate(width/2, height/2),
     F.translateOverTime(gui.v2_x, gui.v2_y),
-    F.circle(gui.v0_radius, gui.v0_mult, (i) => sin(i * gui.v0_radiusFreq * PI) * gui.v0_radiusMod),
+    F.circle(gui.v0_radius, gui.v0_mult),
+    F.circle(gui.v0_radius, gui.v0_mult, (i) => cos(i * gui.v0_radiusFreq * PI) * gui.v0_radiusMod),
+    F.circle(gui.v1_radius, gui.v1_mult, (i) => noise(cos(i * gui.v1_radiusFreq * PI) * gui.v3_noiseScale) * gui.v3_noiseMult),
     // F.translate(gui.v1_radius, 0),
-    F.heart(gui.v1_radius, gui.v1_mult, (i) => sin(i * gui.v1_radiusFreq * PI) * gui.v1_radiusMod),
-  ]);
+    // F.heart(gui.v1_radius, gui.v1_mult, (i) => sin(i * gui.v1_radiusFreq * PI) * gui.v1_radiusMod),
+  ],
+  [
+    {
+      x: width/2 + 100,
+      y: height/2,
+      f: gui.f,
+    }
+  ]
+  );
 
-  S.render(gui.steps, c);
-  image(c, 0, 0);
+  S.render(gui.steps);
+  // image(c, 0, 0);
 }
 
 
 class Spirograph {
-  constructor(fns) {
+  constructor(fns, magnetPts) {
     this.fns = fns;
+    this.magnetPts = magnetPts;
+  }
+
+  applyMagnetPts(pts) {
+    pts.forEach((pt) => {
+      this.magnetPts.forEach((magnet) => {
+        const dy = magnet.y - pt.y;
+        const dx = magnet.x - pt.x;
+        const ang = atan2(dy, dx);
+        const d = dy ** 2 + dx ** 2;
+
+        const force = createVector(magnet.f / pow(max(d, gui.minD), gui.dPow), 0).rotate(ang);
+        pt.x += force.x;
+        pt.y += force.y;
+      })
+    })
   }
 
   getPts(steps) {
@@ -90,16 +118,17 @@ class Spirograph {
       print(`reduced ${pts.length} pts to ${simplified.length} with threshold ${gui.ptsSimplify}`);
       return simplified;
     }
+
+    this.applyMagnetPts(pts);
     return pts;
   }
 
-  render(steps, c) {
-    c.background(255)
-    c.beginShape();
+  render(steps) {
+    beginShape();
     this.getPts(steps).forEach(pt => {
-      c.vertex(pt.x, pt.y);
+      vertex(pt.x, pt.y);
     })
-    c.endShape();
+    endShape();
   }
 
 }
@@ -110,11 +139,11 @@ const F = {
     fn: () => createVector(x, y),
     input: () => {},
   }),
-  circle: (radius, times = 1, radiusModify = () => 0) => ({ // draw circle
+  circle: (radius, times = 1, radiusModify = () => 1) => ({ // draw circle
     fn: ({radius, rotate}) => createVector(radius, 0).rotate(rotate),
     input: (i) => ({
       rotate: times * i * TWO_PI,
-      radius: radius + radiusModify(i),
+      radius: radiusModify(i) * radius,
     })
   }),
   translateOverTime: (x,y) => ({

@@ -3,7 +3,7 @@
 function keyPressed() {
   switch (keyCode) {
     case ALT:
-      save('out','svg');
+      saveSvg('out');
       break;
     case SHIFT:
       noLoop();

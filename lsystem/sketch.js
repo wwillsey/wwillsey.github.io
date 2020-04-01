@@ -23,7 +23,7 @@ const drawings = [
 function keyPressed() {
   switch (keyCode) {
     case ALT:
-      save('out','svg');
+      saveSvg('out')
       break;
     case SHIFT:
       noLoop();
@@ -34,7 +34,7 @@ function keyPressed() {
 }
 
 function setup() {
-  const c = createCanvas(displayWidth*2, displayHeight*2);
+  const c = createCanvas(displayWidth, displayHeight, SVG);
   // print(c)
   // matrix = new Matrix(c.drawingContext);
   stroke(0);
@@ -68,8 +68,8 @@ function draw() {
   }
 
   linesToRender = new LineReducer({
-    modBy: 1,
-    nFixed: 5,
+    modBy: .00000001,
+    nFixed: 8,
   });
 
   const stateStack = [];

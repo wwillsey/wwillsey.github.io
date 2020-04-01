@@ -54,7 +54,7 @@ function handleKeys() {
 }
 
 function offsetFn(i) {
-  return (n - i) * 7;
+  return (n - i) * ;
 }
 
 

@@ -12,8 +12,8 @@ const N = 500;
 const TOP = 254;
 const MID = 127;
 
-const w = 1500;
-const h = 1500;
+let w;
+let h;
 const nBalls = 40000;
 
 let paused = false;
@@ -39,14 +39,18 @@ function keyPressed() {
 
 function setup() {
   mainCanvas = createCanvas(displayWidth, displayHeight, WEBGL);
+  w = width ;
+  h = height ;
   // randomSeed(1)
   gui = new GUI();
 
 
   gui.add('friction', 0, 0, 1);
-  gui.add('gravity', 0, -1, 1);
-  gui.add('mouseDownAmt', 0, -1, 1);
-  gui.add('mouseDownSize', 0, 0,1);
+  gui.add('gravity', 0, -1, 1, .01);
+  gui.add('mouseDownAmt', 0, -1, 1, .01);
+  gui.add('mouseDownSize', 0, 0,1, .01);
+  gui.add('lookAheadDist', 5, 0,100, .1);
+  gui.add('lookAheadRotate', .1, 0,PI);
 
   workingCanvas = createGraphics(w, h, WEBGL);
   workingCanvas.pixelDensity(1)
@@ -66,7 +70,7 @@ function setup() {
   frameRate(48)
   background(0)
 
-  initWithCircle({x: .5, y: .5}, .9, currentPositions, currentVelocities)
+  // initWithCircle({x: .5, y: .5}, .9, currentPositions, currentVelocities)
   // translate(-width/2, -height/2);
   currentPositions.loadPixels();
   currentPositions.updatePixels();
@@ -87,7 +91,10 @@ function initNewCanvas(w, h) {
 
 function draw() {
   if (paused) return;
-  // initWithParticles(100, currentPositions, currentVelocities);
+
+
+  if(frameCount % 50 == 1)
+    initWithParticles(2000, currentPositions, currentVelocities);
   // if(frameCount < 5) return;
   // print(frameRate())
   updatePositions(currentPositions, nextPositions, currentVelocities);
@@ -157,6 +164,9 @@ function updateVelocities(currentPositions, currentVelocities, nextVelocities) {
   updateVelocitiesShader.setUniform('gravity', gui.gravity);
   updateVelocitiesShader.setUniform('mouseDownAmt', gui.mouseDownAmt);
   updateVelocitiesShader.setUniform('mouseDownSize', gui.mouseDownSize);
+  updateVelocitiesShader.setUniform('lastFrame', mainCanvas);
+  updateVelocitiesShader.setUniform('lookAheadDist', gui.lookAheadDist);
+  updateVelocitiesShader.setUniform('lookAheadRotate', gui.lookAheadRotate);
 
 
   workingCanvas.rect(0,0, width, height);
@@ -188,6 +198,10 @@ function initWithCircle(pos, radPercent, currentPositions, currentVelocities) {
 }
 
 function initWithParticles(n, currentPositions, currentVelocities) {
+  currentPositions.loadPixels();
+  currentVelocities.loadPixels();
+  // currentPositions.updatePixels();
+  // currentVelocities.updatePixels();
   for(let i = 0; i < n; i++) {
     createRandomParticle(currentPositions, currentVelocities);
   }
@@ -197,8 +211,15 @@ function initWithParticles(n, currentPositions, currentVelocities) {
 
 function createRandomParticle(currentPositions, currentVelocities) {
   // let pos = createVector(2.95, 2.5);
-  let pos = createVector(random(currentPositions.width), random(currentPositions.height));
-  let vel = createVector(0,0);
+  // const randX = random(currentPositions.width)
+  // const randY = random(currentPositions.height)
+
+  const randX = min(max(0, randomGaussian(currentPositions.width/2, 100)), currentPositions.width-1)
+  const randY = min(max(0, randomGaussian(currentPositions.height/2, 100)), currentPositions.height-1)
+
+  let pos = createVector(floor(randX) + .5, floor(randY) + .5);
+
+  let vel = createVector(1,0).rotate(random(TWO_PI));
 
   const loc = createVector(floor(pos.x), floor(pos.y));
 
@@ -208,9 +229,22 @@ function createRandomParticle(currentPositions, currentVelocities) {
 
 function setColorAt(canvas, pos, col) {
   // print('setting ', canvas, pos, [red(col), green(col), blue(col), alpha(col)]);
-  canvas.set(pos.x, pos.y, col);
+  // canvas.set(pos.x, pos.y, col);
   // canvas.stroke(col);
   // canvas.point(pos.x, pos.y);
+
+  let off = floor((pos.y * canvas.width + pos.x) * 4)
+  canvas.pixels[off] = red(col);
+  canvas.pixels[off + 1] = green(col);
+  canvas.pixels[off + 2] = blue(col);
+  canvas.pixels[off + 3] = alpha(col);
+
+  // let components = [
+  //   canvas.pixels[off],
+  //   canvas.pixels[off + 1],
+  //   canvas.pixels[off + 2],
+  //   canvas.pixels[off + 3]
+  // ];
 }
 
 

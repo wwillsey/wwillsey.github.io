@@ -8,7 +8,7 @@ const spaceY = 500;
 let gui;
 
 function setup() {
-  createCanvas(1200, 900, SVG);
+  createCanvas(1200, 900);
   noFill();
   // stroke('#ED225D');
   stroke(0);
@@ -41,7 +41,7 @@ function keyPressed() {
 function draw() {
   noiseSeed(round(gui.ns * 1000000));
   noiseDetail(gui.octaves, gui.falloff);
-  background(0,0);
+  background(255);
   // if (frameCount > 0) {
   //   noLoop();
   // }

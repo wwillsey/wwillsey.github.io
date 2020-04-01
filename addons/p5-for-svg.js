@@ -12935,6 +12935,21 @@ function report(message, func, color) {
 }
 
 /**
+ * converts angles from RADIANS into the current angleMode
+ *
+ * @method _fromRadians
+ * @private
+ * @param {Number} angle
+ * @returns {Number}
+ */
+p5.prototype._fromRadians = function(angle) {
+  if (this._angleMode === 'p5.angleMode') {
+    return angle * 180.0/PI;
+  }
+  return angle;
+};
+
+/**
  * Validate all the parameters of a function for number and type
  * NOTE THIS FUNCTION IS TEMPORARILY DISABLED UNTIL FURTHER WORK
  * AND UPDATES ARE IMPLEMENTED. -LMCCART
@@ -24500,6 +24515,18 @@ p5.Vector.prototype.add = function (x, y, z) {
   this.y += y || 0;
   this.z += z || 0;
   return this;
+};
+
+p5.Vector.prototype.angleBetween = function angleBetween(v) {
+  var dotmagmag = this.dot(v) / (this.mag() * v.mag());
+  // Mathematically speaking: the dotmagmag variable will be between -1 and 1
+  // inclusive. Practically though it could be slightly outside this range due
+  // to floating-point rounding issues. This can make Math.acos return NaN.
+  //
+  // Solution: we'll clamp the value to the -1,1 range
+  var angle = Math.acos(Math.min(1, Math.max(-1, dotmagmag)));
+  if (this.p5) return this.p5._fromRadians(angle);
+  return angle;
 };
 
 /**

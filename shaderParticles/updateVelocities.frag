@@ -10,6 +10,7 @@ varying vec2 vTexCoord;
 
 uniform sampler2D positions;
 uniform sampler2D velocities;
+uniform sampler2D lastFrame;
 uniform float MAXSPEED;
 uniform bool mouseDown;
 uniform vec2 mousePos;
@@ -18,6 +19,8 @@ uniform float frictionAmt;
 uniform float gravity;
 uniform float mouseDownAmt;
 uniform float mouseDownSize;
+uniform float lookAheadDist;
+uniform float lookAheadRotate;
 
 const int nBorSize = 3;
 
@@ -60,6 +63,30 @@ bool hasPt(vec4 positionValue) {
   return step(1., positionValue.z) == 1.;
 }
 
+vec2 applySlimeForce(vec2 vel, vec2 pos) {
+  vec2 dirLeft = vec2(
+    cos(lookAheadRotate) * vel.x - sin(lookAheadRotate) * vel.y,
+    sin(lookAheadRotate) * vel.x + cos(lookAheadRotate) * vel.y
+  );
+  vec2 dirRight = vec2(
+    cos(-lookAheadRotate) * vel.x - sin(-lookAheadRotate) * vel.y,
+    sin(-lookAheadRotate) * vel.x + cos(-lookAheadRotate) * vel.y
+  );
+
+
+  float vLeft = length(texture(lastFrame, pos + normalize(dirLeft) * lookAheadDist));
+  float vStraight = length(texture(lastFrame, pos + normalize(vel) * lookAheadDist));
+  float vRight = length(texture(lastFrame, pos + normalize(dirRight) * lookAheadDist));
+
+  if (vLeft > vStraight && vLeft > vRight) {
+    return dirLeft;
+  }
+  if (vRight > vStraight && vRight > vLeft) {
+    return dirRight;
+  }
+  return vel;
+}
+
 vec2 applyForceOnVel(vec2 vel, vec2 pos) {
   pos /= resolution;
   vel += .003925;
@@ -75,6 +102,9 @@ vec2 applyForceOnVel(vec2 vel, vec2 pos) {
   vel.x -= sign(vel.x) * vel.x * vel.x  * frictionAmt;
   vel.y -= sign(vel.y) * vel.y * vel.y *  frictionAmt;
   // vel -= normalize(vel) * friction * frictionAmt;
+
+  // vel = normalize(vel) * 2.;
+  vel = applySlimeForce(vel, pos * resolution);
 
   vel.y += gravity;
   return vel;

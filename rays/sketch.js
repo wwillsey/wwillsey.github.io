@@ -1,7 +1,7 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 const MAX_DEPTH = 6;
 const SCALE = 1;
-const N_RAYS = 1200;
+const N_RAYS = 100;
 
 const noPrint = true;
 const renderMode = false;
@@ -25,6 +25,16 @@ function keyPressed(){
     case ENTER:
       reset();
   }
+  switch (keyCode) {
+    case ALT:
+      save('out','svg');
+      break;
+    case SHIFT:
+      noLoop();
+      break;
+    default:
+      break;
+  }
 }
 
 function touchMoved() {
@@ -39,10 +49,10 @@ function mouseClicked() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
+  createCanvas(displayWidth, displayHeight, SVG);
   // createCanvas(2880, 1800);
   E = new p5.Ease();
-  gui = new GUI();
+  gui = new Ray_GUI();
 
   if (noPrint) {
     print = () => {};
@@ -92,15 +102,17 @@ function draw() {
   scale(SCALE)
 
   if (mouse.active) {
-    mouse.pt = createVector(mouseX, mouseY).mult(1/SCALE);
+    // mouse.pt = createVector(mouseX, mouseY).mult(1/SCALE);
+    mouse.pt = createVector(width/2, height * gui.ptY).mult(1/SCALE);
   }
 
   // const mouse = createVector(width * .4, height * .36).mult(1/SCALE);
   const rays = createRayCone(mouse.pt.copy(), 0, TWO_PI, gui.nRays);
+  rays.push(...createRayCone(mouse.pt.copy().add(0, height/2 - mouse.pt.y - (mouse.pt.y - height/2)), 0, TWO_PI, gui.nRays))
   // const rays = [new Ray(createVector(0, 500), 0, {depth: 0})]
 
   stroke(200)
-  strokeWeight(5)
+  strokeWeight(1)
   world.render();
   // stroke(color(241, 235, 232, 1))
   stroke(color(...gui.color))
@@ -168,7 +180,7 @@ class CircularWorldObject {
 
   render() {
     fill(0, 0);
-    circle(this.center.x, this.center.y, this.radius * 2, this.radius * 2, 100, 100);
+    ellipse(this.center.x, this.center.y, this.radius * 2, this.radius * 2, 100, 100);
   }
 
   cast(ray) {
@@ -188,10 +200,15 @@ class CircularWorldObject {
       const x1 = (-b - sqrt(d)) / (2 * a);
       const y1 = m * x1 + k;
 
+      const angBetween = (v1, v2) => {
+        const ang = abs(acos(p5.Vector.dot(v1,v2) / v1.mag() / v2.mag()))
+        return min(TWO_PI - ang, ang);
+      }
+
       const minPt =  minBy([
         createVector(x0, y0),
         createVector(x1, y1)
-      ].filter(pt => abs(pt.copy().sub(ray.origin).angleBetween(createVector(1,0).rotate(ray.dir))) < .01 && pt.dist(ray.origin) > .01 ), pt => ray.origin.dist(pt));
+      ].filter(pt => abs(pt.copy().sub(ray.origin).angleBetween(createVector(1,0).rotate(ray.dir))) < .001 && pt.dist(ray.origin) > .01 ), pt => ray.origin.dist(pt));
 
       print('minpt',minPt)
       print('pt0', x0, y0, createVector(x0, y0).copy().sub(ray.origin));
@@ -348,17 +365,19 @@ function preserveMouse() {
   rendered = false;
 }
 
-class GUI {
+class Ray_GUI {
   constructor() {
     this.gui = new dat.GUI();
 
+    this.ptY = .5;
+    this.gui.add(this, 'ptY', 0, 1, .001).onChange(preserveMouse)
     this.nRays = N_RAYS;
-    this.gui.add(this, 'nRays', 1, 20000).onChange(preserveMouse)
+    this.gui.add(this, 'nRays', 1, 1000).onChange(preserveMouse)
     this.max_depth = MAX_DEPTH;
     this.gui.add(this, 'max_depth', 1, 20).onChange(preserveMouse)
     this.stroke_weight = 1;
     this.gui.add(this, 'stroke_weight', 0, 10).onChange(preserveMouse)
-    this.color = [255,255,255,1]
+    this.color = [255,255,255,50]
     this.gui.addColor(this, 'color').onChange(preserveMouse)
   }
 }

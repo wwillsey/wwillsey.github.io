@@ -2,12 +2,16 @@
 let gui;
 let camera;
 
+let s;
 let noisePos = 0;
+
+p5.disableFriendlyErrors = true;
+
 
 function keyPressed() {
   switch (keyCode) {
     case ALT:
-      save('out','svg');
+      saveSvg('out')
       break;
     case SHIFT:
       noLoop();
@@ -18,50 +22,68 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
+  createCanvas(displayWidth, displayHeight, SVG);
   gui = new GUI();
 
-  gui.add('camera_x', width/2, 0, width);
-  gui.add('camera_y', height/2, 0, width);
-  gui.add('camera_z', width/2, 0, width);
-  gui.add('camera_f', 500, 0, 10000);
+  gui.add('camera_x', width/2, 0, width).onChange(redraw);
+  gui.add('camera_y', height/2, 0, width).onChange(redraw);
+  gui.add('camera_z', width/2, 0, width).onChange(redraw);
+  gui.add('camera_f', 500, 0, 10000).onChange(redraw);
 
-  gui.add('s', 100, 0, width);
-  gui.add('x', 0, 0, width);
-  gui.add('y', 0, 0, width);
-  gui.add('z', 1000, -10000, 10000);
-  gui.add('ang', 0, 0, TWO_PI);
-  gui.add('slices', 10, 0, 100);
-  gui.add('detail', 20, 0, 1000);
-  gui.add('noiseScale', .01, 0, .1);
-  gui.add('noiseScale2', 0, 0, 1);
-  gui.add('noiseVel', 0, 0.0, .2);
-  gui.add('ptsSimplify', 0, 0, 1);
-  gui.add('n', 1000, 0, 10000);
+  gui.add('s', 100, 0, width).onChange(redraw);
+  gui.add('x', width/2, 0, width).onChange(redraw);
+  gui.add('y', height/2, 0, width).onChange(redraw);
+  gui.add('z', 0, -10000, 10000).onChange(redraw);
+  gui.add('rotateX', 0, 0, 360, .00001).onChange(redraw);
+  gui.add('rotateY', 0, 0, 360, .00001).onChange(redraw);
+  gui.add('rotateZ', 0, 0, 360, .00001).onChange(redraw);
 
+  gui.add('detailX', 5, 2, 1000).onChange(redraw);
+  gui.add('detailY', 5, 2, 1000).onChange(redraw);
 
-  stroke(255);
+  gui.add('ang', 0, 0, TWO_PI).onChange(redraw);
+  gui.add('slices', 10, 0, 100).onChange(redraw);
+  gui.add('detail', 20, 0, 1000).onChange(redraw);
+  gui.add('noiseScale', .01, 0, .1).onChange(redraw);
+  gui.add('noiseScale2', 0, 0, 1).onChange(redraw);
+  gui.add('noiseVel', 0, 0.0, .2).onChange(redraw);
+  gui.add('ptsSimplify', 0, 0, 1).onChange(redraw);
+  gui.add('n', 1000, 0, 10000).onChange(redraw);
+  gui.add('roundTo', 1, 0, 10).onChange(redraw);
+  gui.add('fn', 0, 0, 10, 1).onChange(redraw);
+
+  stroke(0);
 }
 
 
 function draw() {
   noisePos += gui.noiseVel
   // strokeWeight(3);
-  background(0);
+  // background(255);
+  clear();
   camera = {
     x: gui.camera_x,
     y: gui.camera_y,
     z: gui.camera_z,
     f: gui.camera_f,
   }
-  // drawCube(gui.s, gui.x, gui.y, gui.z);
 
-  // drawSphere(width * .2 + gui.x, height/2+gui.y, gui.z, 200, round(gui.slices), round(gui.detail))
-  // drawSphere(width * .5+ gui.x, height/2+gui.y, gui.z, 200, round(gui.slices), round(gui.detail))
-  // drawSphere(width * .8+ gui.x, height/2+gui.y, gui.z, 200, round(gui.slices), round(gui.detail))
+  // s = new SVGSphere(createVector(gui.x, gui.y, gui.z), gui.s, gui.detailX, gui.detailY);
 
-  randomSeed(0)
-  drawTunnel(width * .5 + gui.x, height * .5 + gui.y, gui.z, 100, 10000, gui.n);
+  const pos = createVector(gui.x, gui.y, gui.z);
+
+  const fn = [
+    trefoil(pos, gui.s)
+  ][gui.fn];
+
+
+  // rotateX(gui.rotateX);
+  // applyMatrix(1, 0, 0, 1, 40 + gui.rotateX * 100, 50);
+
+  s = new ParametricGeometry(fn, gui.detailX, gui.detailY);
+
+  s.render();
+  noLoop();
 }
 
 function drawCube(s, x, y, z) {
@@ -179,10 +201,376 @@ function line3d(pt1, pt2) {
   const p1 = transform(pt1);
   const p2 = transform(pt2);
 
+  if (gui.roundTo > 0) {
+    roundPt(p1, gui.roundTo);
+    roundPt(p2, gui.roundTo);
+  }
+
   line(p1.x, p1.y, p2.x, p2.y);
 }
 
 
 function transform(pt) {
-  return createVector((pt.x - camera.x) * camera.f / pt.z + camera.x, (pt.y - camera.y) * camera.f / pt.z + camera.y);
+  return createVector((pt.x - camera.x) * camera.f / (pt.z - camera.z) + camera.x, (pt.y - camera.y) * camera.f / (pt.z - camera.z) + camera.y);
+}
+
+function roundPt(pt, to = 1) {
+  pt.x -= pt.x % to;
+  pt.y -= pt.y % to;
+}
+
+class SVGGeometry extends p5.Geometry3D {
+  constructor(opts) {
+    super();
+  }
+
+  filterFaces() {
+    // this.computeFaceNormals();
+    // this.faces = this.faces.filter((f, i) => {
+    //   const n = this.faceNormals[i];
+
+    //   return n.z < 0;
+    // })
+
+  }
+
+  getLinesFromFaces() {
+    const graph = {};
+    this.faces.forEach(face => {
+      const [a,b,c] = face.slice().sort();
+      [a,b,c].forEach(x => {
+        if (!graph[x]) {
+          graph[x] = {}
+        }
+      });
+
+      graph[a][b] = true;
+      graph[a][c] = true;
+      graph[b][c] = true;
+    });
+    const lines = [];
+    Object.keys(graph).forEach(a => Object.keys(graph[a]).forEach(b => {
+      const p1 = this.vertices[a];
+      const p2 = this.vertices[b];
+      lines.push([p1, p2]);
+    }))
+
+    return lines;
+  }
+
+  render() {
+    this.mergeVertices();
+    // this.filterFaces();
+
+    const lines3d = this.getLinesFromFaces();
+    lines3d.forEach(([p1,p2]) => {
+      line3d(p1,p2);
+    });
+  }
+}
+
+
+class SVGSphere extends SVGGeometry {
+  constructor(pos, radius, detailX, detailY) {
+    super()
+
+    const fn = (u, v) => {
+      var theta = 2 * Math.PI * u;
+      var phi = Math.PI * v - Math.PI / 2;
+      var x = radius * Math.cos(phi) * Math.sin(theta);
+      var y = radius * Math.sin(phi);
+      var z = radius * Math.cos(phi) * Math.cos(theta);
+      return new p5.Vector(x, y, z).add(pos);
+    };
+    this.parametricGeometry(fn, detailX, detailY);
+  }
+}
+
+class ParametricGeometry extends SVGGeometry {
+  constructor(fn, detailX, detailY) {
+    super();
+    this.parametricGeometry(fn, detailX, detailY);
+  }
+}
+
+
+function trefoil(pos,r) {
+  return (a,b) => {
+    const u = 2 * Math.PI * a;
+    const v = Math.PI * b - Math.PI / 2;
+
+    const x = r * Math.sin(3 * u) / (2 + Math.cos(v))
+    const y = r * (Math.sin(u) + 2 * Math.sin(2 * u)) / (2 + Math.cos(v + Math.PI * 2 / 3))
+    const z = r / 2 * (Math.cos(u) - 2 * Math.cos(2 * u)) * (2 + Math.cos(v)) * (2 + Math.cos(v + Math.PI * 2 / 3)) / 4
+
+    return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
+  }
+}
+
+function rotateVectorX(v, theta) {
+  const s = Math.sin(theta);
+  const c = Math.cos(theta);
+  return createVector(
+    v.x * c - v.y * s,
+    v.x * s + v.y * c,
+    v.z
+  );
+}
+
+function rotateVectorY(v, theta) {
+  const s = Math.sin(theta);
+  const c = Math.cos(theta);
+  return createVector(
+    v.x * c + v.z * s,
+    v.y,
+    - v.x * s + v.z * c
+  );
+}
+
+function rotateVectorZ(v, theta) {
+  const s = Math.sin(theta);
+  const c = Math.cos(theta);
+  return createVector(
+    v.x,
+    v.y * c - v.z * s,
+    v.y * s + v.z * c
+  );
+}
+
+function rotateVector(v, x,y,z) {
+  x = x / 180 * PI;
+  y = y / 180 * PI;
+  z = z / 180 * PI;
+  return rotateVectorZ(rotateVectorY(rotateVectorX(v, x), y), z);
+}
+
+
+class Triangle {
+  constructor(a,b,c) {
+    this.a = a;
+    this.b = b;
+    this.c = c;
+  }
+}
+
+
+function doTrianglesIntersect(t1, t2) {
+
+  /*
+  Adapated from section "4.1 Separation of Triangles" of:
+
+   - [Dynamic Collision Detection using Oriented Bounding Boxes](https://www.geometrictools.com/Documentation/DynamicCollisionDetection.pdf)
+  */
+
+
+  // Triangle 1:
+
+  var A0 = t1.a;
+  var A1 = t1.b;
+  var A2 = t1.c;
+
+  var E0 = A1.copy().sub(A0);
+  var E1 = A2.copy().sub(A0);
+
+  var E2 = E1.copy().sub(E0);
+
+  var N = E0.copy().cross(E1);
+
+
+  // Triangle 2:
+
+  var B0 = t2.a;
+  var B1 = t2.b;
+  var B2 = t2.c;
+
+  var F0 = B1.copy().sub(B0);
+  var F1 = B2.copy().sub(B0);
+
+  var F2 = F1.copy().sub(F0);
+
+  var M = F0.copy().cross(F1);
+
+
+  var D = B0.copy().sub(A0);
+
+
+  function areProjectionsSeparated(p0, p1, p2, q0, q1, q2) {
+    var min_p = Math.min(p0, p1, p2),
+        max_p = Math.max(p0, p1, p2),
+        min_q = Math.min(q0, q1, q2),
+        max_q = Math.max(q0, q1, q2);
+
+    return ((min_p > max_q) || (max_p < min_q));
+  }
+
+
+  // Only potential separating axes for non-parallel and non-coplanar triangles are tested.
+
+
+  // Seperating axis: N
+
+  {
+    var p0 = 0,
+        p1 = 0,
+        p2 = 0,
+        q0 = N.dot(D),
+        q1 = q0 + N.dot(F0),
+        q2 = q0 + N.dot(F1);
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Separating axis: M
+
+  {
+    var p0 = 0,
+        p1 = M.dot(E0),
+        p2 = M.dot(E1),
+        q0 = M.dot(D),
+        q1 = q0,
+        q2 = q0;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E0 × F0
+
+  {
+    var p0 = 0,
+        p1 = 0,
+        p2 = -(N.dot(F0)),
+        q0 = E0.copy().cross(F0).dot(D),
+        q1 = q0,
+        q2 = q0 + M.dot(E0);
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E0 × F1
+
+  {
+    var p0 = 0,
+        p1 = 0,
+        p2 = -(N.dot(F1)),
+        q0 = E0.copy().cross(F1).dot(D),
+        q1 = q0 - M.dot(E0),
+        q2 = q0;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E0 × F2
+
+  {
+    var p0 = 0,
+        p1 = 0,
+        p2 = -(N.dot(F2)),
+        q0 = E0.copy().cross(F2).dot(D),
+        q1 = q0 - M.dot(E0),
+        q2 = q1;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E1 × F0
+
+  {
+    var p0 = 0,
+        p1 = N.dot(F0),
+        p2 = 0,
+        q0 = E1.copy().cross(F0).dot(D),
+        q1 = q0,
+        q2 = q0 + M.dot(E1);
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E1 × F1
+
+  {
+    var p0 = 0,
+        p1 = N.dot(F1),
+        p2 = 0,
+        q0 = E1.copy().cross(F1).dot(D),
+        q1 = q0 - M.dot(E1),
+        q2 = q0;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E1 × F2
+
+  {
+    var p0 = 0,
+        p1 = N.dot(F2),
+        p2 = 0,
+        q0 = E1.copy().cross(F2).dot(D),
+        q1 = q0 - M.dot(E1),
+        q2 = q1;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E2 × F0
+
+  {
+    var p0 = 0,
+        p1 = N.dot(F0),
+        p2 = p1,
+        q0 = E2.copy().cross(F0).dot(D),
+        q1 = q0,
+        q2 = q0 + M.dot(E2);
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E2 × F1
+
+  {
+    var p0 = 0,
+        p1 = N.dot(F1),
+        p2 = p1,
+        q0 = E2.copy().cross(F1).dot(D),
+        q1 = q0 - M.dot(E2),
+        q2 = q0;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  // Seperating axis: E2 × F2
+
+  {
+    var p0 = 0,
+        p1 = N.dot(F2),
+        p2 = p1,
+        q0 = E2.copy().cross(F2).dot(D),
+        q1 = q0 - M.dot(E2),
+        q2 = q1;
+
+    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
+      return false;
+  }
+
+
+  return true;
 }

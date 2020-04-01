@@ -62,10 +62,10 @@ void main() {
   vec3 posColor = texture2D(positions, uv).xyz;
   vec4 velColor = texture2D(velocities, uv);
 
-  float thresh = applyThreshold(posColor, .1);
+  float thresh = applyThreshold(posColor, .5);
   vec3 color = vec3(thresh) * (1. - length(velColor2vec(velColor)));
 
-  color = mix(lastColor, color, max(color.x,.07));
+  color = mix(lastColor, color, max(color.x,.03));
 
 
   gl_FragColor = vec4(color, 1.);
