@@ -44,8 +44,10 @@ function setup() {
   gui.add('ang', 0, 0, TWO_PI).onChange(redraw);
   gui.add('slices', 10, 0, 100).onChange(redraw);
   gui.add('detail', 20, 0, 1000).onChange(redraw);
-  gui.add('noiseScale', .01, 0, .1).onChange(redraw);
-  gui.add('noiseScale2', 0, 0, 1).onChange(redraw);
+  gui.add('noiseScale', .1, 0, 10).onChange(redraw);
+  gui.add('noiseMult', 1, 0, 10000).onChange(redraw);
+  gui.add('noiseOffset', 0, -1, 1, 0.0001).onChange(redraw);
+  gui.add('noisePow', 1, 0, 10, .0001).onChange(redraw);
   gui.add('noiseVel', 0, 0.0, .2).onChange(redraw);
   gui.add('ptsSimplify', 0, 0, 1).onChange(redraw);
   gui.add('n', 1000, 0, 10000).onChange(redraw);
@@ -73,7 +75,9 @@ function draw() {
   const pos = createVector(gui.x, gui.y, gui.z);
 
   const fn = [
-    trefoil(pos, gui.s)
+    trefoil(pos, gui.s),
+    noiseSphere(pos, gui.s),
+    noisePlane(pos, gui.s, gui.s)
   ][gui.fn];
 
 
@@ -214,9 +218,14 @@ function transform(pt) {
   return createVector((pt.x - camera.x) * camera.f / (pt.z - camera.z) + camera.x, (pt.y - camera.y) * camera.f / (pt.z - camera.z) + camera.y);
 }
 
+function transformTo2D(pt) {
+  return gui.roundTo > 0 ? roundPt(transform(pt), gui.roundTo) : transform(pt)
+}
+
 function roundPt(pt, to = 1) {
   pt.x -= pt.x % to;
   pt.y -= pt.y % to;
+  return pt;
 }
 
 class SVGGeometry extends p5.Geometry3D {
@@ -224,22 +233,26 @@ class SVGGeometry extends p5.Geometry3D {
     super();
   }
 
-  filterFaces() {
-    // this.computeFaceNormals();
-    // this.faces = this.faces.filter((f, i) => {
-    //   const n = this.faceNormals[i];
-
-    //   return n.z < 0;
-    // })
-
+  backfaceCull() {
+    this.computeFaceNormals();
+    this.faces = this.faces.filter((f, i) => {
+      const n = this.faceNormals[i];
+      return this.vertices[f[0]].copy().sub(camera.x, camera.y, camera.z).dot(n) > 0
+    })
   }
 
-  getLinesFromFaces() {
+
+  getVertices2D() {
+    return this.vertices.map((v) => transformTo2D(v));
+  }
+
+  getLinesFromFaces(twoD = true) {
+    const verticesList = twoD ? this.getVertices2D() : this.vertices;
     const graph = {};
     this.faces.forEach(face => {
       const [a,b,c] = face.slice().sort();
       [a,b,c].forEach(x => {
-        if (!graph[x]) {
+        if (graph[x] == undefined) {
           graph[x] = {}
         }
       });
@@ -250,8 +263,8 @@ class SVGGeometry extends p5.Geometry3D {
     });
     const lines = [];
     Object.keys(graph).forEach(a => Object.keys(graph[a]).forEach(b => {
-      const p1 = this.vertices[a];
-      const p2 = this.vertices[b];
+      const p1 = verticesList[a];
+      const p2 = verticesList[b];
       lines.push([p1, p2]);
     }))
 
@@ -260,19 +273,20 @@ class SVGGeometry extends p5.Geometry3D {
 
   render() {
     this.mergeVertices();
-    // this.filterFaces();
+    this.backfaceCull();
 
-    const lines3d = this.getLinesFromFaces();
-    lines3d.forEach(([p1,p2]) => {
-      line3d(p1,p2);
+    const lines2d = this.getLinesFromFaces();
+    lines2d.forEach(([p1,p2]) => {
+      line(p1.x, p1.y, p2.x, p2.y);
     });
   }
 }
 
 
 class SVGSphere extends SVGGeometry {
-  constructor(pos, radius, detailX, detailY) {
+  constructor(pos, radius, detailX, detailY, transformTo2D) {
     super()
+    this.transformTo2D = transformTo2D;
 
     const fn = (u, v) => {
       var theta = 2 * Math.PI * u;
@@ -287,8 +301,9 @@ class SVGSphere extends SVGGeometry {
 }
 
 class ParametricGeometry extends SVGGeometry {
-  constructor(fn, detailX, detailY) {
+  constructor(fn, detailX, detailY, transformTo2D) {
     super();
+    this.transformTo2D = transformTo2D;
     this.parametricGeometry(fn, detailX, detailY);
   }
 }
@@ -305,6 +320,31 @@ function trefoil(pos,r) {
 
     return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
   }
+}
+
+function noiseSphere(pos, r) {
+  return (u, v) => {
+    var theta = 2 * Math.PI * u;
+    var phi = Math.PI * v - Math.PI / 2;
+
+    // print(theta, phi)
+    const n = noise(gui.noiseScale * sin(theta), gui.noiseScale * sin(phi)) * gui.noiseMult;
+    const radius =  r + n;
+
+    var x = radius * Math.cos(phi) * Math.sin(theta);
+    var y = radius * Math.sin(phi);
+    var z = n;//radius * Math.cos(phi) * Math.cos(theta);
+    return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
+  };
+}
+
+function noisePlane(pos, w, h) {
+  return (u,v) => {
+      var x = 2 * w * u - w;
+      var y = 2 * h * v - h;
+      var z = -((noise(pos.x + x / w * gui.noiseScale, pos.y + y / h * gui.noiseScale) -gui.noiseOffset) ** gui.noisePow) * gui.noiseMult;
+      return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
+  };
 }
 
 function rotateVectorX(v, theta) {
