@@ -251,8 +251,8 @@ class SVGGeometry extends p5.Geometry3D {
     const graph = {};
 
     this.faces = (this.faces.sort((a,b) => {
-      const va = Math.max(...a.map(f => this.vertices[f].z));
-      const vb = Math.max(...b.map(f => this.vertices[f].z));
+      const va = mean(a.map(f => this.vertices[f].z));
+      const vb = mean(b.map(f => this.vertices[f].z));
 
       return va - vb;
     }));
@@ -291,7 +291,7 @@ class SVGGeometry extends p5.Geometry3D {
       const faceIdx = graph[a][b];
       const faceVerts = this.faces[faceIdx].map(f => this.vertices[f].z);
       // noPrint(faceVerts)
-      const zOrder = Math.max(...faceVerts);
+      const zOrder = mean(faceVerts);
 
       const line = {
         x1: p1.x,
@@ -411,54 +411,62 @@ class SVGGeometry extends p5.Geometry3D {
     const addedFaces = [];
 
     let calls = 0;
-    const attemptToAddLine = (line) => {
-      // if (calls++ > 500) return;
-      noPrint('attempt to split line', line);
+    const attemptToAddLine = (lines) => {
 
-      // const p1Lines = tree.nearest({x: line.x2, y: line.y2}, this.faces.length * 3, [longestLineSqDist]) || [];
-      // const p2Lines = tree.nearest({x: line.x2, y: line.y2}, this.faces.length * 3, [longestLineSqDist]) || [];
 
-      const p1Lines = treeList;
-      const p2Lines = [];
+      while(lines.length > 0) {
+        const line = lines.splice(-1)[0];
+        // const p1Lines = tree.nearest({x: line.x1, y: line.y1}, this.faces.length * 3, [longestLineSqDist]) || [];
+        // const p2Lines = tree.nearest({x: line.x2, y: line.y2}, this.faces.length * 3, [longestLineSqDist]) || [];
 
-      const linesToConsiderMap = {};
-      p1Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
-      p2Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
+        const p1Lines = treeList;
+        const p2Lines = [];
 
-      const linesToConsider = Object.values(linesToConsiderMap);
+        const linesToConsiderMap = {};
+        p1Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
+        p2Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
 
-      noPrint({linesToConsider})
-      for (let i = 0; i < linesToConsider.length; i++) {
-        const splitter = linesToConsider[i];
-        const split = splitLine(line, splitter);
+        const linesToConsider = Object.values(linesToConsiderMap);
 
-        if (split.length == 2) {
-          noPrint('split found', split)
-          attemptToAddLine(split[0]);
-          attemptToAddLine(split[1]);
-          return;
+        noPrint({linesToConsider})
+        let lineSplit = false;
+        for (let i = 0; i < linesToConsider.length; i++) {
+          const splitter = linesToConsider[i];
+          const split = splitLine(line, splitter);
+
+          if (split.length == 2) {
+            noPrint('split found', split)
+            // attemptToAddLine(split[0]);
+            // attemptToAddLine(split[1]);
+            lines.push(...split);
+            lineSplit = true;
+            // return
+            break;
+          }
         }
-      }
-      // if it made it here, then no intersection,
-      const midPt = {
-        x: (line.x1 + line.x2) / 2,
-        y: (line.y1 + line.y2) / 2
-      };
+        if (!lineSplit) {
+          // if it made it here, then no intersection,
+          const midPt = {
+            x: (line.x1 + line.x2) / 2,
+            y: (line.y1 + line.y2) / 2
+          };
 
-      const faceO = faceOverlap(midPt);
-      if(faceO == false) {
-        addToTree(tree, line);
-        finalLines.push(line);
-        noPrint('successfully added line', line);
-      } else {
-        noPrint('line not added due to face collision', line, faceO)
+          const faceO = faceOverlap(midPt);
+          if(faceO == false) {
+            addToTree(tree, line);
+            finalLines.push(line);
+            noPrint('successfully added line', line);
+          } else {
+            noPrint('line not added due to face collision', line, faceO)
+          }
+        }
       }
     };
 
 
     const addFace = (faceLineList, face_idx) => {
       faceLineList.forEach(line => {
-        attemptToAddLine(line)
+        attemptToAddLine([line])
       });
       addedFaces.push(face_idx);
     };
@@ -472,7 +480,7 @@ class SVGGeometry extends p5.Geometry3D {
     const zOrderSort = (a,b) => {
       // noPrint(a,b)
       return b[1][0].zOrder - a[1][0].zOrder;
-    };
+    }
 
     const facesZOrdered = Object.entries(faces).slice()
       .sort(zOrderSort);
@@ -875,3 +883,12 @@ function segment_intersection(x1,y1,x2,y2, x3,y3,x4,y4) {
 }
 
 function noPrint() {}
+
+
+function mean(args) {
+  // print(args)
+  // let s = 0;
+  // args.forEach(v => s+=v)
+  // return args.length ==0 ? 0 : s / args.length
+  return Math.max(...args)
+}
