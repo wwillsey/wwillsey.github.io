@@ -234,7 +234,6 @@ class SVGGeometry extends p5.Geometry3D {
   }
 
   backfaceCull() {
-    this.computeFaceNormals();
     this.faces = this.faces.filter((f, i) => {
       const n = this.faceNormals[i];
       return this.vertices[f[0]].copy().sub(camera.x, camera.y, camera.z).dot(n) > 0
@@ -254,7 +253,13 @@ class SVGGeometry extends p5.Geometry3D {
       const va = mean(a.map(f => this.vertices[f].z));
       const vb = mean(b.map(f => this.vertices[f].z));
 
-      return va - vb;
+      const n = va - vb;
+      if (abs(n) < .0001) {
+        const n1 = this.vertices[a[0]].copy().sub(camera.x, camera.y, camera.z).dot(n);
+        const n2 = this.vertices[b[0]].copy().sub(camera.x, camera.y, camera.z).dot(n);
+        return n1 - n2;
+      }
+      return n;
     }));
 
     noPrint(this.faces, this.faces.map(f => f.map(i => this.vertices[i])))
@@ -325,6 +330,10 @@ class SVGGeometry extends p5.Geometry3D {
     const distFn = (l1, l2) => (l1.x - l2.x) ** 2 + (l1.y - l2.y) ** 2;
     const tree = new kdTree([], distFn, ["x","y"]);
     const treeList = [];
+
+    const longestLineDist = sqrt(longestLineSqDist);
+    const lineBinSize = longestLineDist * sqrt(2);
+    const lineBins = {};
     // noPrint('longestLineSqDist', longestLineSqDist)
 
     /*
@@ -380,13 +389,42 @@ class SVGGeometry extends p5.Geometry3D {
       // tree.insert(p1);
       // tree.insert(p2);
 
-      treeList.push([p1]);
-      treeList.push([p2]);
-      // noPrint(treeList.slice())
+      // treeList.push(p1);
+      // treeList.push(p2);
+
+      // if (treeList.length % 100 == 0)
+      //   rebalanceTree(tree, treeList, distFn)
+
+      const b1 = {
+        x: floor(p1.x / lineBinSize),
+        y: floor(p1.y / lineBinSize),
+      };
+
+      const b2 = {
+        x: floor(p2.x / lineBinSize),
+        y: floor(p2.y / lineBinSize),
+      };
+      if(lineBins[b1.x] == undefined) {
+        lineBins[b1.x] = {};
+        lineBins[b1.x][b1.y] = [[p1]];
+      }
+      else if(lineBins[b1.x][b1.y] == undefined) lineBins[b1.x][b1.y] = [[p1]];
+      else {
+        lineBins[b1.x][b1.y].push([p1]);
+      }
+
+      if(lineBins[b2.x] == undefined) {
+        lineBins[b2.x] = {};
+        lineBins[b2.x][b2.y] = [[p2]];
+      }
+      else if(lineBins[b2.x][b2.y] == undefined) lineBins[b2.x][b2.y] = [[p2]];
+      else {
+        lineBins[b2.x][b2.y].push([p2]);
+      }
     }
 
     const ptInTriangle = (p, p0, p1, p2) => {
-      var A = 1/2 * (-p1.y * p2.x + p0.y * (-p1.x + p2.x) + p0.x * (p1.y - p2.y) + p1.x * p2.y);
+      var A = .5 * (-p1.y * p2.x + p0.y * (-p1.x + p2.x) + p0.x * (p1.y - p2.y) + p1.x * p2.y);
       var sign = A < 0 ? -1 : 1;
       var s = (p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * p.x + (p0.x - p2.x) * p.y) * sign;
       var t = (p0.x * p1.y - p0.y * p1.x + (p0.y - p1.y) * p.x + (p1.x - p0.x) * p.y) * sign;
@@ -398,8 +436,15 @@ class SVGGeometry extends p5.Geometry3D {
     }
 
     const faceOverlap = (pt) => {
-      for(let i = 0; i < addedFaces.length; i++) {
-        const face = this.faces[addedFaces[i]].map(idx => verticesList[idx]);
+      const b = {
+        x: 0,//floor(pt.x / lineBinSize),
+        y: 0,//floor(pt.y / lineBinSize),
+      };
+      const facesToLook = (addedFaces[b.x] == undefined ? new Set() : addedFaces[b.x][b.y] || new Set())
+      const facesIterator = facesToLook.values();
+      for(let i = 0; i < facesToLook.size; i++) {
+        const faceIdx = int(facesIterator.next().value);
+        const face = this.faces[faceIdx].map(idx => verticesList[idx]);
         if (ptInTriangle(pt, ...face)) {
           return face;
         }
@@ -408,30 +453,49 @@ class SVGGeometry extends p5.Geometry3D {
     }
 
     const finalLines = [];
-    const addedFaces = [];
+    const addedFaces = {};
 
     let calls = 0;
     const attemptToAddLine = (lines) => {
 
 
+      let anyAdded = false;
       while(lines.length > 0) {
         const line = lines.splice(-1)[0];
         // const p1Lines = tree.nearest({x: line.x1, y: line.y1}, this.faces.length * 3, [longestLineSqDist]) || [];
         // const p2Lines = tree.nearest({x: line.x2, y: line.y2}, this.faces.length * 3, [longestLineSqDist]) || [];
 
-        const p1Lines = treeList;
-        const p2Lines = [];
+        const b1 = {
+          x: floor(line.x1 / lineBinSize),
+          y: floor(line.y1 / lineBinSize),
+        };
 
-        const linesToConsiderMap = {};
-        p1Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
-        p2Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
+        const b2 = {
+          x: floor(line.x2 / lineBinSize),
+          y: floor(line.y2 / lineBinSize),
+        };
 
-        const linesToConsider = Object.values(linesToConsiderMap);
+        const p1Lines = lineBins[b1.x] == undefined ? [] :
+          lineBins[b1.x][b1.y] == undefined ? [] : lineBins[b1.x][b1.y]
 
+        const p2Lines = lineBins[b2.x] == undefined ? [] :
+          lineBins[b2.x][b2.y] == undefined ? [] : lineBins[b2.x][b2.y]
+        // const p1Lines = treeList;
+        // const p2Lines = [];
+
+        // const linesToConsiderMap = {};
+        // p1Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
+        // p2Lines.forEach(r => linesToConsiderMap[r[0].line.id] = r[0].line);
+
+        const linesToConsiderSet = new Set(p1Lines.concat(p2Lines).map(r => r[0].line));
+        const linesToConsider = linesToConsiderSet.values();
+        // const linesToConsider = Object.values(linesToConsiderMap);
+
+        // print(linesToConsider.length)
         noPrint({linesToConsider})
         let lineSplit = false;
-        for (let i = 0; i < linesToConsider.length; i++) {
-          const splitter = linesToConsider[i];
+        for (let i = 0; i < linesToConsiderSet.size; i++) {
+          const splitter = linesToConsider.next().value;
           const split = splitLine(line, splitter);
 
           if (split.length == 2) {
@@ -456,19 +520,38 @@ class SVGGeometry extends p5.Geometry3D {
             addToTree(tree, line);
             finalLines.push(line);
             noPrint('successfully added line', line);
+            anyAdded = true;
           } else {
             noPrint('line not added due to face collision', line, faceO)
           }
         }
       }
+      return anyAdded
     };
 
 
     const addFace = (faceLineList, face_idx) => {
-      faceLineList.forEach(line => {
-        attemptToAddLine([line])
+      const added = faceLineList.filter(line => {
+        return attemptToAddLine([line])
       });
-      addedFaces.push(face_idx);
+
+      if (added.length > 0) {
+        faceLineList.forEach((faceLine) => {
+          const b = {
+            x: 0,//floor(faceLine.x1 / lineBinSize),
+            y: 0,//floor(faceLine.y1 / lineBinSize),
+          };
+
+          if(addedFaces[b.x] == undefined) {
+            addedFaces[b.x] = {};
+            addedFaces[b.x][b.y] = new Set([face_idx])
+          }
+          else if(addedFaces[b.x][b.y] == undefined) addedFaces[b.x][b.y] = new Set([face_idx]);
+          else {
+            addedFaces[b.x][b.y].add(face_idx)
+          }
+        });
+      }
     };
 
 
@@ -503,6 +586,7 @@ class SVGGeometry extends p5.Geometry3D {
 
   render() {
     this.mergeVertices();
+    this.computeFaceNormals();
     // this.backfaceCull();
 
     const lines2d = this.getLinesFromFaces();
@@ -891,4 +975,14 @@ function mean(args) {
   // args.forEach(v => s+=v)
   // return args.length ==0 ? 0 : s / args.length
   return Math.max(...args)
+}
+
+
+function rebalanceTree(tree, points, distanceFn) {
+  const start = tree.balanceFactor();
+  const startTime = Date.now();
+  tree = new kdTree(points, distanceFn, ["x", "y"]);
+  const end = tree.balanceFactor();
+
+  print(`rebalanced tree from ${start} to ${end} in ${Date.now() - startTime}ms`);
 }
