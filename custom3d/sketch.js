@@ -2,11 +2,18 @@
 let gui;
 let camera;
 
+let obj;
+
 let s;
 let noisePos = 0;
 
 p5.disableFriendlyErrors = true;
 
+
+// function preload() {
+//   noPrint(this)
+//   // obj = loadModel("../media/20mm_cube.stl", true);
+// }
 
 function keyPressed() {
   switch (keyCode) {
@@ -22,7 +29,7 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
+  createCanvas(displayWidth, displayHeight,SVG);
   gui = new GUI();
 
   gui.add('camera_x', width/2, 0, width).onChange(redraw);
@@ -47,16 +54,20 @@ function setup() {
   gui.add('noiseScale', .1, 0, 10).onChange(redraw);
   gui.add('noiseMult', 0, 0, 10000).onChange(redraw);
   gui.add('noiseOffset', 0, -1, 1, 0.0001).onChange(redraw);
+  gui.add('noiseVel', 0, -100, 100, .00001).onChange(redraw);
   gui.add('noisePow', 1, 0, 10, .0001).onChange(redraw);
-  gui.add('noiseVel', 0, 0.0, .2).onChange(redraw);
   gui.add('ptsSimplify', 0, 0, 1).onChange(redraw);
   gui.add('n', 1000, 0, 10000).onChange(redraw);
   gui.add('roundTo', 1, 0, 10).onChange(redraw);
   gui.add('fn', 0, 0, 10, 1).onChange(redraw);
+  gui.add('trianglePrecision', .5, 0, 10, .000001).onChange(redraw);
+  gui.add('backfaceCull', false, false).onChange(redraw);
 
   stroke(0);
 }
 
+
+let noiseZ = 0;
 
 function draw() {
   noisePos += gui.noiseVel
@@ -84,114 +95,24 @@ function draw() {
   // rotateX(gui.rotateX);
   // applyMatrix(1, 0, 0, 1, 40 + gui.rotateX * 100, 50);
 
-  s = new ParametricGeometry(fn, gui.detailX, gui.detailY);
 
-  s.render();
+  noiseZ = 0;
+  noiseZ += gui.noiseVel;
+  // stroke(255,0,0);
+  // new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
+  // noiseZ += gui.noiseVel;
+  // stroke(0,255,0, 255/3);
+  // new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
+  // noiseZ += gui.noiseVel;
+  stroke(0,0,255, 255/3);
+  new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
+
+  // if (obj) {
+  //   s.faces = obj.faces
+  //   s.vertices = obj.vertices;
+  // }
+
   noLoop();
-}
-
-function drawCube(s, x, y, z) {
-  const verts = [
-    createVector(-s, -s, -s),
-    createVector(s, -s, -s),
-    createVector(s, s, -s),
-    createVector(-s, s, -s),
-    createVector(-s, -s, s),
-    createVector(s, -s, s),
-    createVector(s, s, s),
-    createVector(-s, s, s),
-  ];
-
-  verts.forEach(pt => {
-    pt.rotate(gui.ang).add(x,y,z)
-  })
-
-  const lines = [
-    [0,1],
-    [1,2],
-    [2,3],
-    [3,0],
-    [4,5],
-    [5,6],
-    [6,7],
-    [7,4],
-    [0,4],
-    [1,5],
-    [2,6],
-    [3,7],
-  ];
-
-
-  lines.forEach(([i,j]) => {
-    const p1 = verts[i];
-    const p2 = verts[j];
-    line3d(p1, p2);
-  });
-
-}
-
-function getSpherePts(x,y,z, r, slices, detail) {
-
-  // noPrint({x,y,z, r, slices, detail})
-  const pts = [];
-  for(let i =0; i <= slices; i++) {
-
-    const rad = max(r * sin(PI * i / slices), 1);
-
-    const offset =  r - i / slices * r * 2
-
-    // noPrint(offset)
-
-    const getPt = (ang) => {
-      const p = createVector(rad, 0, 0).rotate(ang);
-      p.setMag(p.mag() - p.mag() * (noise(p.x * gui.noiseScale, p.y * gui.noiseScale, noisePos) - noise(p.x * gui.noiseScale, p.y * gui.noiseScale, noisePos + gui.noiseScale2)))
-      return p.add(x,y,z + offset)
-    }
-
-    let slicePts = Array.from({length: detail}, (v, idx) => {
-      const p1 = getPt(idx / detail * TWO_PI)
-      // const p2 = getPt((idx+1) / detail * TWO_PI)
-      return p1
-    })
-
-    if (gui.ptsSimplify > 0) {
-      const simplified = simplify(slicePts, gui.ptsSimplify, false);
-      // noPrint(`reduced ${slicePts.length} pts to ${simplified.length} with threshold ${gui.ptsSimplify}`);
-      slicePts = simplified;
-    }
-
-    pts.push(slicePts);
-  }
-  return pts;
-}
-
-function drawSphere(x,y,z, r, slices, detail) {
-  noFill();
-  getSpherePts(x,y,z,r,slices,detail).forEach((slice) => {
-    strokeWeight(camera.f / slice[0].z)
-
-    // line3d(p1,p2);
-    beginShape()
-    slice.forEach(pt => {
-      const p2d = transform(pt);
-      vertex(p2d.x, p2d.y)
-    })
-    endShape(CLOSE);
-  })
-}
-
-function drawTunnel(x,y,z,r,depth, n) {
-  for (let i = 0; i < n; i++) {
-    const [start,end] = [z, random(z, z + depth)].sort();
-    const pt1 = createVector(0,r).rotate(random(TWO_PI)).add(x,y,start);
-    const pt2 = pt1.copy().add(0,0,end-start);
-
-
-    strokeWeight(camera.f / (pt1.z + pt2.z) / 2);
-    // noPrint(pt1, pt2)
-    line3d(pt1, pt2);
-
-  }
 }
 
 function point3d(x,y,z) {
@@ -236,7 +157,7 @@ class SVGGeometry extends p5.Geometry3D {
   backfaceCull() {
     this.faces = this.faces.filter((f, i) => {
       const n = this.faceNormals[i];
-      return this.vertices[f[0]].copy().sub(camera.x, camera.y, camera.z).dot(n) > 0
+      return this.vertices[f[0]].copy().sub(camera.x, camera.y, camera.z).dot(n) < 0
     })
   }
 
@@ -247,6 +168,7 @@ class SVGGeometry extends p5.Geometry3D {
 
   getLinesFromFaces(twoD = true) {
     const verticesList = twoD ? this.getVertices2D() : this.vertices;
+    noPrint(verticesList)
     const graph = {};
 
     this.faces = (this.faces.sort((a,b) => {
@@ -262,7 +184,7 @@ class SVGGeometry extends p5.Geometry3D {
       return n;
     }));
 
-    noPrint(this.faces, this.faces.map(f => f.map(i => this.vertices[i])))
+    // noPrint(this.faces, this.faces.map(f => f.map(i => this.vertices[i])))
 
     this.faces.forEach((face, face_idx) => {
       const [a,b,c] = face.slice().sort();
@@ -281,7 +203,7 @@ class SVGGeometry extends p5.Geometry3D {
     /**
      * generate lines to be drawn by getting only distinct lines
      */
-    const eq = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2 < .001;
+    const eq = (x1, y1, x2, y2) => (x1 - x2) ** 2 + (y1 - y2) ** 2 < .1;
 
     const endPts = [];
     const faces = {}
@@ -294,10 +216,13 @@ class SVGGeometry extends p5.Geometry3D {
       if(eq(p1.x, p1.y, p2.x, p2.y)) return;
 
       const faceIdx = graph[a][b];
-      const faceVerts = this.faces[faceIdx].map(f => this.vertices[f].z);
+      const faceVerts = this.faces[faceIdx].map(f => this.vertices[f]);
       // noPrint(faceVerts)
-      const zOrder = mean(faceVerts);
+      const n = this.faceNormals[faceIdx];
+      const norm = faceVerts[0].copy().sub(camera.x, camera.y, camera.z).dot(n) * .0000001;
+      const zOrder = mean(faceVerts.map(v => v.z)) - norm;
 
+      // noPrint(zOrder, norm)
       const line = {
         x1: p1.x,
         y1: p1.y,
@@ -429,18 +354,28 @@ class SVGGeometry extends p5.Geometry3D {
       var s = (p0.y * p2.x - p0.x * p2.y + (p2.y - p0.y) * p.x + (p0.x - p2.x) * p.y) * sign;
       var t = (p0.x * p1.y - p0.y * p1.x + (p0.y - p1.y) * p.x + (p1.x - p0.x) * p.y) * sign;
 
-      return s > 0 && t > 0 && (s + t) < 2 * A * sign;
+      noPrint({p, p0, p1, p2, A, sign, s, t})
+      const pre = gui.trianglePrecision;
+      return s > pre && t > pre && (s + t) < 2 * A * sign && abs((s + t) - 2 * A * sign) > pre;
       // if (inSide) {
 
       // }
     }
 
     const faceOverlap = (pt) => {
-      const b = {
-        x: 0,//floor(pt.x / lineBinSize),
-        y: 0,//floor(pt.y / lineBinSize),
+      const b1 = {
+        x: floor(pt.x / lineBinSize),
+        y: floor(pt.y / lineBinSize),
       };
-      const facesToLook = (addedFaces[b.x] == undefined ? new Set() : addedFaces[b.x][b.y] || new Set())
+      const facesToLook1 = (addedFaces[b1.x] == undefined ? new Set() : addedFaces[b1.x][b1.y] || new Set())
+      const b2 = {
+        x: floor(pt.x / lineBinSize),
+        y: floor(pt.y / lineBinSize),
+      };
+      const facesToLook2 = (addedFaces[b2.x] == undefined ? new Set() : addedFaces[b2.x][b2.y] || new Set())
+
+      const facesToLook = union(facesToLook1, facesToLook2)
+
       const facesIterator = facesToLook.values();
       for(let i = 0; i < facesToLook.size; i++) {
         const faceIdx = int(facesIterator.next().value);
@@ -491,7 +426,7 @@ class SVGGeometry extends p5.Geometry3D {
         const linesToConsider = linesToConsiderSet.values();
         // const linesToConsider = Object.values(linesToConsiderMap);
 
-        // print(linesToConsider.length)
+        // noPrint(linesToConsider.length)
         noPrint({linesToConsider})
         let lineSplit = false;
         for (let i = 0; i < linesToConsiderSet.size; i++) {
@@ -537,19 +472,34 @@ class SVGGeometry extends p5.Geometry3D {
 
       if (added.length > 0) {
         faceLineList.forEach((faceLine) => {
-          const b = {
-            x: 0,//floor(faceLine.x1 / lineBinSize),
-            y: 0,//floor(faceLine.y1 / lineBinSize),
+          const b1 = {
+            x: floor(faceLine.x1 / lineBinSize),
+            y: floor(faceLine.y1 / lineBinSize),
+          };
+          const b2 = {
+            x: floor(faceLine.x2 / lineBinSize),
+            y: floor(faceLine.y2 / lineBinSize),
           };
 
-          if(addedFaces[b.x] == undefined) {
-            addedFaces[b.x] = {};
-            addedFaces[b.x][b.y] = new Set([face_idx])
+          if(addedFaces[b1.x] == undefined) {
+            addedFaces[b1.x] = {};
+            addedFaces[b1.x][b1.y] = new Set([face_idx])
           }
-          else if(addedFaces[b.x][b.y] == undefined) addedFaces[b.x][b.y] = new Set([face_idx]);
+          else if(addedFaces[b1.x][b1.y] == undefined) addedFaces[b1.x][b1.y] = new Set([face_idx]);
           else {
-            addedFaces[b.x][b.y].add(face_idx)
+            addedFaces[b1.x][b1.y].add(face_idx)
           }
+
+          if(addedFaces[b2.x] == undefined) {
+            addedFaces[b2.x] = {};
+            addedFaces[b2.x][b2.y] = new Set([face_idx])
+          }
+          else if(addedFaces[b2.x][b2.y] == undefined) addedFaces[b2.x][b2.y] = new Set([face_idx]);
+          else {
+            addedFaces[b2.x][b2.y].add(face_idx)
+          }
+
+
         });
       }
     };
@@ -587,7 +537,7 @@ class SVGGeometry extends p5.Geometry3D {
   render() {
     this.mergeVertices();
     this.computeFaceNormals();
-    // this.backfaceCull();
+    gui.backfaceCull ? this.backfaceCull() : null;
 
     const lines2d = this.getLinesFromFaces();
     lines2d.forEach((l) => {
@@ -642,12 +592,14 @@ function noiseSphere(pos, r) {
     var phi = Math.PI * v - Math.PI / 2;
 
     // noPrint(theta, phi)
-    const n = noise(gui.noiseScale * sin(theta), gui.noiseScale * sin(phi)) * gui.noiseMult;
+    const n = pow((noise(gui.noiseScale * sin(theta), gui.noiseScale * sin(phi), noiseZ) - gui.noiseOffset), gui.noisePow) * gui.noiseMult;
     const radius =  r + n;
 
     var x = radius * Math.cos(phi) * Math.sin(theta);
     var y = radius * Math.sin(phi);
     var z = radius * Math.cos(phi) * Math.cos(theta);
+    // var z = radius + ((noise(pos.x + x / w * gui.noiseScale, pos.y + y / h * gui.noiseScale, noiseZ) -gui.noiseOffset) ** gui.noisePow) * gui.noiseMult;
+
     return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
   };
 }
@@ -656,7 +608,7 @@ function noisePlane(pos, w, h) {
   return (u,v) => {
       var x = 2 * w * u - w;
       var y = 2 * h * v - h;
-      var z = -((noise(pos.x + x / w * gui.noiseScale, pos.y + y / h * gui.noiseScale) -gui.noiseOffset) ** gui.noisePow) * gui.noiseMult;
+      var z = -pow((noise(pos.x + x / w * gui.noiseScale, pos.y + y / h * gui.noiseScale, noiseZ) -gui.noiseOffset), gui.noisePow) * gui.noiseMult;
       return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
   };
 }
@@ -698,239 +650,7 @@ function rotateVector(v, x,y,z) {
   return rotateVectorZ(rotateVectorY(rotateVectorX(v, x), y), z);
 }
 
-
-class Triangle {
-  constructor(a,b,c) {
-    this.a = a;
-    this.b = b;
-    this.c = c;
-  }
-}
-
-
-function doTrianglesIntersect(t1, t2) {
-
-  /*
-  Adapated from section "4.1 Separation of Triangles" of:
-
-   - [Dynamic Collision Detection using Oriented Bounding Boxes](https://www.geometrictools.com/Documentation/DynamicCollisionDetection.pdf)
-  */
-
-
-  // Triangle 1:
-
-  var A0 = t1.a;
-  var A1 = t1.b;
-  var A2 = t1.c;
-
-  var E0 = A1.copy().sub(A0);
-  var E1 = A2.copy().sub(A0);
-
-  var E2 = E1.copy().sub(E0);
-
-  var N = E0.copy().cross(E1);
-
-
-  // Triangle 2:
-
-  var B0 = t2.a;
-  var B1 = t2.b;
-  var B2 = t2.c;
-
-  var F0 = B1.copy().sub(B0);
-  var F1 = B2.copy().sub(B0);
-
-  var F2 = F1.copy().sub(F0);
-
-  var M = F0.copy().cross(F1);
-
-
-  var D = B0.copy().sub(A0);
-
-
-  function areProjectionsSeparated(p0, p1, p2, q0, q1, q2) {
-    var min_p = Math.min(p0, p1, p2),
-        max_p = Math.max(p0, p1, p2),
-        min_q = Math.min(q0, q1, q2),
-        max_q = Math.max(q0, q1, q2);
-
-    return ((min_p > max_q) || (max_p < min_q));
-  }
-
-
-  // Only potential separating axes for non-parallel and non-coplanar triangles are tested.
-
-
-  // Seperating axis: N
-
-  {
-    var p0 = 0,
-        p1 = 0,
-        p2 = 0,
-        q0 = N.dot(D),
-        q1 = q0 + N.dot(F0),
-        q2 = q0 + N.dot(F1);
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Separating axis: M
-
-  {
-    var p0 = 0,
-        p1 = M.dot(E0),
-        p2 = M.dot(E1),
-        q0 = M.dot(D),
-        q1 = q0,
-        q2 = q0;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E0 × F0
-
-  {
-    var p0 = 0,
-        p1 = 0,
-        p2 = -(N.dot(F0)),
-        q0 = E0.copy().cross(F0).dot(D),
-        q1 = q0,
-        q2 = q0 + M.dot(E0);
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E0 × F1
-
-  {
-    var p0 = 0,
-        p1 = 0,
-        p2 = -(N.dot(F1)),
-        q0 = E0.copy().cross(F1).dot(D),
-        q1 = q0 - M.dot(E0),
-        q2 = q0;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E0 × F2
-
-  {
-    var p0 = 0,
-        p1 = 0,
-        p2 = -(N.dot(F2)),
-        q0 = E0.copy().cross(F2).dot(D),
-        q1 = q0 - M.dot(E0),
-        q2 = q1;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E1 × F0
-
-  {
-    var p0 = 0,
-        p1 = N.dot(F0),
-        p2 = 0,
-        q0 = E1.copy().cross(F0).dot(D),
-        q1 = q0,
-        q2 = q0 + M.dot(E1);
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E1 × F1
-
-  {
-    var p0 = 0,
-        p1 = N.dot(F1),
-        p2 = 0,
-        q0 = E1.copy().cross(F1).dot(D),
-        q1 = q0 - M.dot(E1),
-        q2 = q0;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E1 × F2
-
-  {
-    var p0 = 0,
-        p1 = N.dot(F2),
-        p2 = 0,
-        q0 = E1.copy().cross(F2).dot(D),
-        q1 = q0 - M.dot(E1),
-        q2 = q1;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E2 × F0
-
-  {
-    var p0 = 0,
-        p1 = N.dot(F0),
-        p2 = p1,
-        q0 = E2.copy().cross(F0).dot(D),
-        q1 = q0,
-        q2 = q0 + M.dot(E2);
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E2 × F1
-
-  {
-    var p0 = 0,
-        p1 = N.dot(F1),
-        p2 = p1,
-        q0 = E2.copy().cross(F1).dot(D),
-        q1 = q0 - M.dot(E2),
-        q2 = q0;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  // Seperating axis: E2 × F2
-
-  {
-    var p0 = 0,
-        p1 = N.dot(F2),
-        p2 = p1,
-        q0 = E2.copy().cross(F2).dot(D),
-        q1 = q0 - M.dot(E2),
-        q2 = q1;
-
-    if (areProjectionsSeparated(p0, p1, p2, q0, q1, q2))
-      return false;
-  }
-
-
-  return true;
-}
-
-
-var eps = 0.00000001;
+var eps = 0.0001;
 function between(a, b, c) {
     return a-eps <= b && b <= c+eps;
 }
@@ -970,7 +690,7 @@ function noPrint() {}
 
 
 function mean(args) {
-  // print(args)
+  // noPrint(args)
   // let s = 0;
   // args.forEach(v => s+=v)
   // return args.length ==0 ? 0 : s / args.length
@@ -984,5 +704,23 @@ function rebalanceTree(tree, points, distanceFn) {
   tree = new kdTree(points, distanceFn, ["x", "y"]);
   const end = tree.balanceFactor();
 
-  print(`rebalanced tree from ${start} to ${end} in ${Date.now() - startTime}ms`);
+  noPrint(`rebalanced tree from ${start} to ${end} in ${Date.now() - startTime}ms`);
+}
+
+
+
+function union(a, b) {
+  const result = new Set();
+
+  a.forEach(value => {
+    result.add(value);
+  });
+
+  b.forEach(value => {
+    result.add(value);
+  });
+
+
+  return result;
+
 }
