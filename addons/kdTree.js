@@ -123,9 +123,11 @@
     };
 
     this.remove = function (point) {
+      print('attempt to remove ', point)
       var node;
 
       function nodeSearch(node) {
+        print('nodeSearch', node);
         if (node === null) {
           return null;
         }
@@ -219,6 +221,7 @@
 
       node = nodeSearch(self.root);
 
+      print('node for removal', node)
       if (node === null) { return; }
 
       removeNode(node);

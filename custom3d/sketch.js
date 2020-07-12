@@ -29,7 +29,7 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight,SVG);
+  createCanvas(displayWidth, displayHeight);
   gui = new GUI();
 
   gui.add('camera_x', width/2, 0, width).onChange(redraw);
@@ -62,6 +62,19 @@ function setup() {
   gui.add('fn', 0, 0, 10, 1).onChange(redraw);
   gui.add('trianglePrecision', .5, 0, 10, .000001).onChange(redraw);
   gui.add('backfaceCull', false, false).onChange(redraw);
+  gui.add('col_topMult', 1, 0, 10, .0001).onChange(redraw);
+  gui.add('col_heightMult', 5, 0, 100, .0001).onChange(redraw);
+  gui.add('col_rows', 3, 0, 100, 1).onChange(redraw);
+  gui.add('col_cols', 3, 0, 100, 1).onChange(redraw);
+  gui.add('spacing', 100, 0, 10000, .0001).onChange(redraw);
+  gui.add('lowPoly', 0, 0, 10, .0001).onChange(redraw);
+  gui.add('dofSteps', 50, 0, 1000, 1).onChange(redraw);
+  gui.add('dofPower', 0, 0, 10, .00001).onChange(redraw);
+  gui.add('dofSamples', 0, 0, 10, .00001).onChange(redraw);
+  gui.add('dofFocal', 0, -5000, 5000, .00001).onChange(redraw);
+  gui.add('dofFalloffNeg', 1, 0, 5, .00001).onChange(redraw);
+  gui.add('dofFalloffPos', 1, 0, 5, .00001).onChange(redraw);
+  gui.add('dofCircleSize', 0.1, 0, 1, .00001).onChange(redraw);
 
   stroke(0);
 }
@@ -99,13 +112,15 @@ function draw() {
   noiseZ = 0;
   noiseZ += gui.noiseVel;
   // stroke(255,0,0);
-  // new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
+  new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
   // noiseZ += gui.noiseVel;
   // stroke(0,255,0, 255/3);
   // new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
   // noiseZ += gui.noiseVel;
-  stroke(0,0,255, 255/3);
-  new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
+  // stroke(0,0,255, 255/3);
+  // new ParametricGeometry(fn, gui.detailX, gui.detailY).render();
+  // const makeFn = (pos) => makeColumn(pos, gui.s, gui.s * gui.col_heightMult, gui.detailX, gui.detailY)
+  // makeColumnGrid(pos, gui.col_rows, gui.col_cols, gui.spacing, makeFn).render()
 
   // if (obj) {
   //   s.faces = obj.faces
@@ -115,11 +130,16 @@ function draw() {
   noLoop();
 }
 
-function point3d(x,y,z) {
-  push()
-  translate(x,y,z);
-  point(0,0)
-  pop()
+function point3d(p) {
+  const p2d = transform(p);
+
+  let d = p.z - gui.dofFocal;
+  let falloff = d < 0 ? gui.dofFalloffNeg : gui.dofFalloffPos;
+  d = pow(abs(d), falloff);
+
+
+  // point(p2d.x, p2d.y);
+  ellipse(p2d.x, p2d.y, max(0.5, d * gui.dofCircleSize), max(0.5, d * gui.dofCircleSize));
 }
 
 function line3d(pt1, pt2) {
@@ -143,11 +163,6 @@ function transformTo2D(pt) {
   return gui.roundTo > 0 ? roundPt(transform(pt), gui.roundTo) : transform(pt)
 }
 
-function roundPt(pt, to = 1) {
-  pt.x -= pt.x % to;
-  pt.y -= pt.y % to;
-  return pt;
-}
 
 class SVGGeometry extends p5.Geometry3D {
   constructor(opts) {
@@ -163,7 +178,7 @@ class SVGGeometry extends p5.Geometry3D {
 
 
   getVertices2D() {
-    return this.vertices.map((v) => transformTo2D(v));
+    return this.vertices.map((v) => transformTo2D(v).add(0,0,v.z));
   }
 
   getLinesFromFaces(twoD = true) {
@@ -226,8 +241,11 @@ class SVGGeometry extends p5.Geometry3D {
       const line = {
         x1: p1.x,
         y1: p1.y,
+        z1: p1.z,
         x2: p2.x,
         y2: p2.y,
+        z2: p2.z,
+
         // faceVerts,
         // faceIdx,
         id: lineId++,
@@ -257,7 +275,7 @@ class SVGGeometry extends p5.Geometry3D {
     const treeList = [];
 
     const longestLineDist = sqrt(longestLineSqDist);
-    const lineBinSize = longestLineDist * sqrt(2);
+    const lineBinSize = longestLineDist * sqrt(2) * 2;
     const lineBins = {};
     // noPrint('longestLineSqDist', longestLineSqDist)
 
@@ -368,13 +386,13 @@ class SVGGeometry extends p5.Geometry3D {
         y: floor(pt.y / lineBinSize),
       };
       const facesToLook1 = (addedFaces[b1.x] == undefined ? new Set() : addedFaces[b1.x][b1.y] || new Set())
-      const b2 = {
-        x: floor(pt.x / lineBinSize),
-        y: floor(pt.y / lineBinSize),
-      };
-      const facesToLook2 = (addedFaces[b2.x] == undefined ? new Set() : addedFaces[b2.x][b2.y] || new Set())
+      // const b2 = {
+      //   x: floor(pt.x / lineBinSize),
+      //   y: floor(pt.y / lineBinSize),
+      // };
+      // const facesToLook2 = (addedFaces[b2.x] == undefined ? new Set() : addedFaces[b2.x][b2.y] || new Set())
 
-      const facesToLook = union(facesToLook1, facesToLook2)
+      const facesToLook = facesToLook1;//union(facesToLook1, facesToLook2)
 
       const facesIterator = facesToLook.values();
       for(let i = 0; i < facesToLook.size; i++) {
@@ -530,19 +548,68 @@ class SVGGeometry extends p5.Geometry3D {
     });
 
     noPrint('calls', calls)
-    noPrint(finalLines)
+    print(finalLines)
     return finalLines;
   }
 
   render() {
+    noFill();
+    stroke(0);
+    strokeWeight(1)
+
     this.mergeVertices();
     this.computeFaceNormals();
     gui.backfaceCull ? this.backfaceCull() : null;
 
     const lines2d = this.getLinesFromFaces();
-    lines2d.forEach((l) => {
+    lines2d.forEach(this.renderLine);
+  }
+
+  renderLine(l) {
+    if (gui.dofSteps > 0) {
+      const stepSize = 1.0 / gui.dofSteps;
+
+      const dofOffset = (d) => {
+        if(gui.dofPower > 0) {
+          return createVector(
+            randomGaussian(0, gui.dofPower * d),
+            randomGaussian(0, gui.dofPower * d),
+          );
+        }
+        return createVector()
+      }
+
+      // print("l",l)
+      for (let i = 0; i <= 1; i += stepSize) {
+        let pos = createVector(
+          (l.x1 * i + l.x2 * (1-i)),
+          (l.y1 * i + l.y2* (1-i)),
+          (l.z1 * i + l.z2* (1-i)),
+        );
+
+        let d = pos.z - gui.dofFocal;
+
+        let falloff = d < 0 ? gui.dofFalloffNeg : gui.dofFalloffPos;
+        d = pow(abs(d), falloff);
+
+        // print(pos, d)
+        const iters = min(max(1, d * gui.dofSamples), 100);
+        for (let j = 0; j < iters; j++) {
+          const offset = dofOffset(d);
+          pos.add(offset);
+          point3d(pos);
+          // print("pos",pos)
+        }
+      }
+    } else {
       line(l.x1, l.y1, l.x2, l.y2);
-    });
+    }
+  }
+
+  add(geom) {
+    geom.mergeVertices();
+    this.faces = this.faces.concat(geom.faces.map(f => f.map(i => i + this.vertices.length)));
+    this.vertices = this.vertices.concat(geom.vertices);
   }
 }
 
@@ -588,16 +655,40 @@ function trefoil(pos,r) {
 
 function noiseSphere(pos, r) {
   return (u, v) => {
+    // print(u,v)
+    if (gui.lowPoly > 0) {
+
+      const newDx = map(u, 0, 1, gui.lowPoly, 1) * gui.detailX;
+      u = u * gui.detailX / newDx;
+      const newDy = map(u, 0, 1, gui.lowPoly, 1) * gui.detailY;
+      v = v * gui.detailX / newDy;
+      // print(u)
+    }
+    // print('done', u, v)
+
     var theta = 2 * Math.PI * u;
     var phi = Math.PI * v - Math.PI / 2;
+
 
     // noPrint(theta, phi)
     const n = pow((noise(gui.noiseScale * sin(theta), gui.noiseScale * sin(phi), noiseZ) - gui.noiseOffset), gui.noisePow) * gui.noiseMult;
     const radius =  r + n;
 
-    var x = radius * Math.cos(phi) * Math.sin(theta);
-    var y = radius * Math.sin(phi);
-    var z = radius * Math.cos(phi) * Math.cos(theta);
+    let xMod = Math.cos(phi) * Math.sin(theta);
+    let yMod = Math.sin(phi);
+    let zMod = Math.cos(phi) * Math.cos(theta);
+
+    // print({xMod, yMod});
+    // if (gui.lowPoly > 0 && yMod > 0) {
+    //   xMod -= xMod % (map(yMod, 0, 1, .001, gui.lowPoly))
+    //   yMod -= yMod % (map(yMod, 0, 1, .001, gui.lowPoly))
+    //   zMod -= zMod % (map(yMod, 0, 1, .001, gui.lowPoly))
+    // }
+    // print({done: true, xMod, yMod});
+
+    var x = radius * xMod;
+    var y = radius * yMod;
+    var z = radius * zMod;
     // var z = radius + ((noise(pos.x + x / w * gui.noiseScale, pos.y + y / h * gui.noiseScale, noiseZ) -gui.noiseOffset) ** gui.noisePow) * gui.noiseMult;
 
     return rotateVector(new p5.Vector(x,y,z), gui.rotateX, gui.rotateY, gui.rotateZ).add(pos);
@@ -707,8 +798,6 @@ function rebalanceTree(tree, points, distanceFn) {
   noPrint(`rebalanced tree from ${start} to ${end} in ${Date.now() - startTime}ms`);
 }
 
-
-
 function union(a, b) {
   const result = new Set();
 
@@ -724,3 +813,147 @@ function union(a, b) {
   return result;
 
 }
+
+
+function makeColumn(pos, r, h, detailX, detailY) {
+  const s = new SVGGeometry()
+  _truncatedCone.call(
+    s, r, r * gui.col_topMult, h, detailX, detailY, false, false);
+  s.vertices.forEach(v => v.add(pos));
+  return s;
+}
+
+function makeColumnGrid(pos, rows, cols, spacing, columnFn) {
+  let g;
+  for (let r = 0; r <= rows; r++) {
+    for (let c = 0; c <= cols; c++) {
+      const colPos = pos.copy().sub(cols * spacing / 2, 0, rows * spacing / 2).add(c * spacing, 0, r * spacing);
+      const col = columnFn(colPos);
+
+      if (!g) {
+        g = col;
+      } else {
+        g.add(col);
+      }
+    }
+  }
+  // print(g.faces)
+
+  const f = new ParametricGeometry(noisePlane(pos.copy().sub(0,gui.s * gui.col_heightMult/2,0), cols * spacing, rows * spacing,), 10, 10, transformTo2D);
+  // print(f.vertices)
+  g.add(f)
+
+  return g;
+}
+
+var _truncatedCone = function _truncatedCone(
+  bottomRadius,
+  topRadius,
+  height,
+  detailX,
+  detailY,
+  bottomCap,
+  topCap
+) {
+  bottomRadius = bottomRadius <= 0 ? 1 : bottomRadius;
+  topRadius = topRadius < 0 ? 0 : topRadius;
+  height = height <= 0 ? bottomRadius : height;
+  detailX = detailX < 3 ? 3 : detailX;
+  detailY = detailY < 1 ? 1 : detailY;
+  bottomCap = bottomCap === undefined ? true : bottomCap;
+  topCap = topCap === undefined ? topRadius !== 0 : topCap;
+  var start = bottomCap ? -2 : 0;
+  var end = detailY + (topCap ? 2 : 0);
+  //ensure constant slant for interior vertex normals
+  var slant = Math.atan2(bottomRadius - topRadius, height);
+  var sinSlant = Math.sin(slant);
+  var cosSlant = Math.cos(slant);
+  var yy, ii, jj;
+  for (yy = start; yy <= end; ++yy) {
+    var v = yy / detailY;
+    var y = height * v;
+    var ringRadius;
+    if (yy < 0) {
+      //for the bottomCap edge
+      y = 0;
+      v = 0;
+      ringRadius = bottomRadius;
+    } else if (yy > detailY) {
+      //for the topCap edge
+      y = height;
+      v = 1;
+      ringRadius = topRadius;
+    } else {
+      //for the middle
+      ringRadius = bottomRadius + (topRadius - bottomRadius) * v;
+    }
+    if (yy === -2 || yy === detailY + 2) {
+      //center of bottom or top caps
+      ringRadius = 0;
+    }
+
+    y -= height / 2; //shift coordiate origin to the center of object
+    for (ii = 0; ii < detailX; ++ii) {
+      var u = ii / detailX;
+      var ur = 2 * Math.PI * u;
+      var sur = Math.sin(ur);
+      var cur = Math.cos(ur);
+
+      //VERTICES
+      this.vertices.push(new p5.Vector(sur * ringRadius, y, cur * ringRadius));
+
+      //VERTEX NORMALS
+      var vertexNormal;
+      if (yy < 0) {
+        vertexNormal = new p5.Vector(0, -1, 0);
+      } else if (yy > detailY && topRadius) {
+        vertexNormal = new p5.Vector(0, 1, 0);
+      } else {
+        vertexNormal = new p5.Vector(sur * cosSlant, sinSlant, cur * cosSlant);
+      }
+      this.vertexNormals.push(vertexNormal);
+      //UVs
+      this.uvs.push(u, v);
+    }
+  }
+
+  var startIndex = 0;
+  if (bottomCap) {
+    for (jj = 0; jj < detailX; ++jj) {
+      var nextjj = (jj + 1) % detailX;
+      this.faces.push([
+        startIndex + jj,
+        startIndex + detailX + nextjj,
+        startIndex + detailX + jj
+      ]);
+    }
+    startIndex += detailX * 2;
+  }
+  for (yy = 0; yy < detailY; ++yy) {
+    for (ii = 0; ii < detailX; ++ii) {
+      var nextii = (ii + 1) % detailX;
+      this.faces.push([
+        startIndex + ii,
+        startIndex + nextii,
+        startIndex + detailX + nextii
+      ]);
+
+      this.faces.push([
+        startIndex + ii,
+        startIndex + detailX + nextii,
+        startIndex + detailX + ii
+      ]);
+    }
+    startIndex += detailX;
+  }
+  if (topCap) {
+    startIndex += detailX;
+    for (ii = 0; ii < detailX; ++ii) {
+      this.faces.push([
+        startIndex + ii,
+        startIndex + (ii + 1) % detailX,
+        startIndex + detailX
+      ]);
+    }
+  }
+};

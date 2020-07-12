@@ -254,8 +254,8 @@ function intersect(x1, y1, x2, y2, x3, y3, x4, y4) {
 
 
 class GUI {
-  constructor() {
-    this.gui = new dat.GUI();
+  constructor(input) {
+    this.gui = input || new dat.GUI();
   }
 
   add(name, defaultVal, ...args) {
@@ -268,6 +268,11 @@ class GUI {
     print(name, defaultVal, ...args);
     this[name] = defaultVal;
     this.gui.addColor(this, name);
+  }
+
+  addFolder(name) {
+    this[name] =  new GUI(this.gui.addFolder(name))
+    return this[name]
   }
 }
 
@@ -525,4 +530,149 @@ function saveSvg(fileName, optimize = true, removeAtt = ["path", 'fill', "stroke
   }
   }
   save(fileName, 'svg');
+}
+
+function roundPt(pt, to = 1) {
+  pt.x -= pt.x % to;
+  pt.y -= pt.y % to;
+  return pt;
+}
+
+
+class PathCollection {
+  constructor() {
+    this.paths = []
+  }
+
+  addPath(path) {
+    if (path instanceof Path) {
+      this.paths.push(path)
+    } else {
+      this.paths.push(new Path(path))
+    }
+  }
+
+  render(opts = {}) {
+    if (opts.optimize) {
+      this.optimize(opts.optimize)
+    }
+    this.paths.forEach(path => path.render(opts.simplify || {}));
+  }
+
+  optimize(opts) {
+    const pathPts = []
+    this.paths.forEach((path, i) => {
+
+      const startPt = path.getStartPt();
+      const endPt = path.getEndPt();
+
+      const start = {
+        id: `${i}:start`,
+        isStartPt: true,
+        minX: startPt.x,
+        maxX: startPt.x,
+        minY: startPt.y,
+        maxY: startPt.y,
+        path
+      };
+      const end = {
+        id: `${i}:end`,
+        isStartPt: false,
+        minX: endPt.x,
+        maxX: endPt.x,
+        minY: endPt.y,
+        maxY: endPt.y,
+        path,
+      }
+
+      end.end = start
+      start.end = end;
+
+      pathPts.push(start)
+      pathPts.push(end)
+    });
+
+    const tree = rbush();
+    tree.load(pathPts)
+
+    // const tree = new kdTree(pathPts, distanceFn, ['x','y']);
+    let pathsToProcess = this.paths.length;
+    let cursorLoc = createVector(pathPts[0].x, pathPts[0].y);
+    let pathsProcessed = [];
+
+    while(pathsToProcess) {
+      // print('all pts',tree.nearest(cursorLoc, 100).map(([p, d])=>p.id).sort());
+      // print('cursor is at', cursorLoc)
+      const pathPt = knn(tree, cursorLoc.x, cursorLoc.y, 1)[0];
+      // print(pathPt)
+      pathsProcessed.push({
+        path: pathPt.path,
+        reversed: !pathPt.isStartPt
+      })
+      cursorLoc = createVector(pathPt.end.minX, pathPt.end.minY);
+      // print('found pathPt', pathPts.filter(p => p == pathPt))
+      // print('found pathPt.end', pathPts.filter(p => p == pathPt.end))
+      tree.remove(pathPt);
+      tree.remove(pathPt.end);
+      pathsToProcess--;
+    }
+
+    // print(pathsProcessed);
+    this.paths = pathsProcessed.map(({path, reversed}) => {
+      if (reversed) {
+        path.pts.reverse();
+      }
+      return path;
+    });
+  }
+}
+
+
+class Path {
+  constructor(pts) {
+    this.pts = pts || []
+  }
+
+  add(pt) {
+    this.pts.push(pt);
+  }
+
+  getStartPt() {
+    return this.pts[this.reversed ? this.pts.length-1 : 0]
+  }
+
+  getEndPt() {
+    return this.pts[this.reversed ? 0 : this.pts.length-1]
+  }
+
+  simplify(tolerance) {
+    this.pts = simplify(this.pts, tolerance);
+  }
+
+  render(opts) {
+    const vertexFn = opts.curve ? curveVertex : vertex;
+    if (opts.simplifyTolerance) {
+      this.simplify(opts.simplifyTolerance)
+    }
+
+    if (this.pts.length == 2) {
+      const start = this.getStartPt();
+      const end = this.getEndPt();
+      line(start.x, start.y, end.x, end.y)
+    } else {
+      beginShape();
+      if (opts.curve) {
+        const pt = this.getStartPt()
+        vertexFn(pt.x, pt.y);
+      }
+
+      this.pts.forEach(pt => vertexFn(pt.x, pt.y))
+
+      if (opts.curve) {
+        const pt = this.getEndPt()
+        vertexFn(pt.x, pt.y);
+      }
+      endShape();
+    }
+  }
 }

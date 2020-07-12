@@ -56,14 +56,14 @@ function draw() {
 
   // stroke(0,255,255, gui.alpha);
   // makeAndDraw('c');
-  
+
   // stroke(255,0,255, gui.alpha);
   makeAndDraw();
-  
+
   // stroke(255,255,0, gui.alpha);
   // makeAndDraw('y');
-  
-  
+
+
   // stroke(0, gui.alpha);
   // makeAndDraw('k');
 }
@@ -76,10 +76,10 @@ function makeAndDraw(colorType) {
       height: img ? img.height : height,
 
       v: (x,y) => {
-        
+
         const distFromCenter = sqrt((x - width/2) ** 2 + (y - height/2) ** 2);
         let v = gui.vOffset;
-        v *= gui.vMult 
+        v *= gui.vMult
         v *= (noise(x * gui.noiseScale, y * gui.noiseScale, gui.noiseZ) ** gui.vPow)
         v *= cos((distFromCenter + frameCount * 10) * gui.freq);
         return abs(v + .00001);
@@ -93,7 +93,7 @@ function makeAndDraw(colorType) {
 
       //   const cmyk = rgb2cmyk(r, g, b, true);
       //   const v = cmyk[colorType];
-        
+
       //   return pow(v, gui.vPow) * gui.vMult;
       // }
     });
@@ -198,7 +198,7 @@ class Network {
   }
 
   render() {
-  
+
     this.getGraph();
 
     print(this.points);

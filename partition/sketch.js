@@ -1,6 +1,6 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 
-let P;
+let P, E;
 
 let gui;
 
@@ -9,7 +9,7 @@ let cutPts = [];
 function keyPressed() {
   switch (keyCode) {
     case ALT:
-      save('out','svg');
+      saveSvg('out');
       break;
     case SHIFT:
       noLoop();
@@ -20,14 +20,14 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(1200, 900, SVG);
+  createCanvas(1000, 1000, SVG);
   print(displayWidth)
   print(displayHeight)
   // fill(150);
   // noStroke();
   background(200)
   // background(0);
-  blendMode(REPLACE);
+  // blendMode(REPLACE);
 
   noFill();
 
@@ -35,13 +35,20 @@ function setup() {
 
   gui = new GUI();
   gui.add('randomSeed', 0, 0, 100).onChange(redraw);
-  gui.add('nPts', 0, 0, 5000).onChange(redraw);
-  gui.add('borderSize', 0, 0, 100).onChange(redraw);
+  gui.add('nPts', 20, 0, 5000, 1).onChange(redraw);
+  gui.add('borderSize', 1.2, 0, 100).onChange(redraw);
   gui.add('stroke', 1, 1, 10).onChange(redraw);
-  gui.add('gaussianRadius', 50, 1, 500).onChange(redraw);
-  gui.add('rows', 1, 1, 20).onChange(redraw);
-  gui.add('cols', 1, 1, 20).onChange(redraw);
-  gui.add('cellScale', 1, 0, 1).onChange(redraw);
+  gui.add('gaussianRadius', 25, 1, 500).onChange(redraw);
+  gui.add('rows', 31, 1, 100, 1).onChange(redraw);
+  gui.add('cols', 31, 1, 100, 1).onChange(redraw);
+  gui.add('cellScale', .9, 0, 1).onChange(redraw);
+  gui.add('noiseScale', .01, 0, 1).onChange(redraw);
+  gui.add('nPow', 1, 0, 10).onChange(redraw);
+
+  E = new p5.Ease();
+  const easeFn = gui.addFolder("easeFn")
+  E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onChange(redraw))
+
 }
 
 function mousePressed() {
@@ -54,11 +61,12 @@ function mousePressed() {
 
 function draw() {
   noLoop();
+  clear()
 
   // noStroke();
-  background(0,0);
+  background(0);
   strokeWeight(gui.stroke)
-  stroke(0);
+  stroke(255);
 
   randomSeed(floor(gui.randomSeed));
 
@@ -74,7 +82,10 @@ function draw() {
 
 
 
-      for(let i = 0; i < gui.nPts; i++) {
+      // const N = noise(row * gui.noiseScale, col * gui.noiseScale);
+      let N = (sqrt((row - gui.rows/2) ** 2 + (col - gui.cols/2) ** 2)) / (sqrt(2) * sqrt(gui.rows**2 + gui.cols**2))
+      N =  applyEase(gui.easeFn, (pow(N, gui.nPow)));
+      for(let i = 0; i < gui.nPts * N; i++) {
         // const pt = createVector(random(width), random(height));
         const pt = createVector(randomGaussian(0, gui.gaussianRadius)).rotate(random(PI)).add(center);
         pt.x = constrain(pt.x, P.p1.x, P.p2.x);
@@ -179,21 +190,54 @@ class LinesCollection {
 
 
   render() {
+
+    const collection = new PathCollection();
+
     let cnt = 0;
     Object.keys(this.lines.v).forEach(k => {
       this.lines.v[k].forEach(([l1,l2]) => {
-        line(k, l1, k, l2);
+        // line(k, l1, k, l2);
+        collection.addPath([createVector(k, l1), createVector(k, l2)])
         cnt++;
       });
     });
 
     Object.keys(this.lines.h).forEach(k => {
       this.lines.h[k].forEach(([l1,l2]) => {
-        line(l1, k, l2, k);
+        // line(l1, k, l2, k);
+        collection.addPath([createVector(l1, k), createVector(l2, k)])
         cnt++
       });
     });
 
+
+
+    collection.render({
+      optimize: {},
+      simplify: {
+        simplifyTolerance: .1
+      }
+    });
+
     print('rendered lines', cnt)
+  }
+}
+
+let easeCache = {}
+function applyEase(folder, val) {
+  for(let i = 0; i < Object.keys(folder).length; i++) {
+    if(folder[Object.keys(folder)[i]] == true) {
+      if (!easeCache[Object.keys(folder)[i]]) {
+        easeCache[Object.keys(folder)[i]] = {}
+      }
+      const test = easeCache[Object.keys(folder)[i]][val]
+      if (test != undefined) {
+        return test
+      }
+
+      const v = E[Object.keys(folder)[i]](val);
+      easeCache[Object.keys(folder)[i]][val] = v;
+      return v;
+    }
   }
 }

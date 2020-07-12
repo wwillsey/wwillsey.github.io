@@ -5,7 +5,7 @@ let canvas;
 let drawCanvas;
 const startSlimes = 1000;
 const maxSlimes = 5000;
-const friction = .007;
+const friction = .001;
 
 const boxLengthMult = .013;
 const boxSizeMult = .009;

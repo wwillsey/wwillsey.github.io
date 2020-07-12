@@ -4,18 +4,31 @@ let opts = {
   mask: {
     w: 10000,
     h: 10000,
-    lineSeparation: 11,
-    lineWidth: 10,
+    lineSeparation: 8.6,
+    lineWidth: 7.1,
     moveSpeed: .3,
   }
 }
 
-const totalFrames = 50;
+
+const totalFrames = 200;
+
+const drawFn = hiddenMotion;
 
 let animation;
 let mainCanvas;
 let img;
 
+function keyPressed() {
+  switch (keyCode) {
+    case ALT:
+      saveCanvas(animation.finalCanvas, "out.png")
+      break;
+
+    default:
+      break;
+  }
+}
 
 function preload() {
   img = loadImage('http://localhost:3000/curve/face2.jpg');
@@ -23,19 +36,21 @@ function preload() {
 
 function setup() {
   createCanvas(displayWidth, displayHeight);
+  pixelDensity(3)
   noSmooth()
   backgroundCol = color(255);
 
   opts.w = width;
   opts.h = height;
 
-  gui = new GUI();
+  gui = new myGUI();
   createAndRunAnimation();
+  frameRate(24)
 }
 
 function draw() {
-  animation.drawWithMask(2000, 2000);
-  // animation.getAnimationFrame(round(frameCount / 2) % totalFrames, noisy);
+  animation.drawWithMask(1100, 600);
+  // animation.getAnimationFrame(round(frameCount) % totalFrames, drawFn);
 }
 
 
@@ -51,9 +66,13 @@ function applyMask(canvas, center, opts, col) {
 class Animation {
   constructor(opts) {
     this.opts = opts;
+    print(this.opts)
     this.finalCanvas = createGraphics(opts.w, opts.h);
+    this.finalCanvas.pixelDensity(3)
     this.animationCanvas = createGraphics(opts.w, opts.h);
+    this.animationCanvas.pixelDensity(3)
     this.workCanvas = createGraphics(opts.w, opts.h);
+    this.workCanvas.pixelDensity(3)
   }
 
   renderFinal(nFrames, animationFn) {
@@ -107,18 +126,55 @@ function movingCircle(canvas, frame) {
 function orbits(canvas, frame) {
   canvas.background(255);
   canvas.noStroke();
-
-  const pos = createVector(canvas.width / 4, 0);
-  const nCircles = 10;
-  pos.rotate(TWO_PI / nCircles * (frame / totalFrames));
+  canvas.push()
+  canvas.translate(-width/2, -height/2)
+  const nCircles = 6;
   for(let i = 0; i < nCircles; i++) {
-    // canvas.fill(200 * frame / totalFrames, 200 * (1 - frame / totalFrames), 0);
-    canvas.fill(lerpColor(color('magenta'), color('orange'), frame / totalFrames));
+    const r = canvas.width * .08;
+    const pos = createVector(r + r * cos(frame / totalFrames * TWO_PI), 0);
+    pos.rotate(TWO_PI * (i / nCircles) + TWO_PI/nCircles * frame/totalFrames);
 
-    canvas.circle(pos.x + canvas.width / 2, pos.y + canvas.height / 2, 200 * sin(frame / totalFrames * PI));
+    // canvas.fill(200 * frame / totalFrames, 200 * (1 - frame / totalFrames), 0);
+    canvas.fill(lerpColor(color("red"), color("blue"), frame / totalFrames > .5 ? 1 : 0));
+
+    canvas.circle(pos.x + canvas.width / 2, pos.y + canvas.height / 2, 50 + 50 * cos(frame / totalFrames * TWO_PI), 50);
     pos.rotate(TWO_PI / nCircles);
   }
+  canvas.pop();
 }
+
+function rotatingBox(canvas, frame) {
+  canvas.clear()
+  canvas.push();
+  canvas.background(255);
+  canvas.stroke(0);
+  canvas.strokeWeight(8);
+  canvas.fill(255);
+  // canvas.translate(-width/2, -height/2)
+  canvas.rotateY(frame / totalFrames * TWO_PI)
+  canvas.rotateZ(frame / totalFrames * PI)
+  canvas.box(400);
+  canvas.pop();
+}
+
+
+function hiddenMotion(canvas, frame) {
+  canvas.clear()
+  canvas.background(255)
+  canvas.textAlign(CENTER, CENTER);
+  canvas.fill(0)
+   .strokeWeight(0)
+
+  const c = cos(frame/totalFrames * TWO_PI);
+
+  canvas.textSize(50 - c * 40);
+  canvas.text("HIDDEN", canvas.width/2, c * 100 + canvas.height/2)
+
+  canvas.textSize(50 - c * 40);
+  canvas.text("MOTION", canvas.width/2, - c * 100 + canvas.height/2)
+}
+
+
 
 function imageMove(canvas, frame) {
   canvas.background(255);
@@ -144,11 +200,11 @@ function noisy(canvas, frame) {
 
 function createAndRunAnimation() {
   animation = new Animation(opts);
-  animation.renderFinal(totalFrames, imageMove);
+  animation.renderFinal(totalFrames, drawFn);
 };
 
 
-class GUI {
+class myGUI {
   constructor() {
     this.gui = new dat.GUI({width: 500});
 

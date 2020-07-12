@@ -1,21 +1,18 @@
 let t1, t2;
 let T;
+let gui;
 
 let c1,c2;
 
-let nScale = .24
 
 let tWidth;
 let tHeight;
 
-const rows = 50;
-const cols = 50;
 const squareTiles = true;
 
 const strokeWeight = 2;
 let strokeCol;
 
-const tWidthScale = .5;
 const noiseSpeed = .1;
 
 let noiseOffset = { x: 0, y: 0, time: 0 };
@@ -23,40 +20,45 @@ let noiseOffset = { x: 0, y: 0, time: 0 };
 
 
 function preload() {
-  t1 = loadImage('http://localhost:3000/truchet/tile1.png');
-  t2 = loadImage('http://localhost:3000/truchet/tile2.png');
   allColors = loadImage('http://localhost:3000/truchet/allColors.jpg')
 }
 function setup() {
   createCanvas(displayWidth, displayHeight);
+  // allColors.tint(255, opacity)
 
-  tWidth = width / cols;
-  tHeight = height / rows;
+  c1 = color(247, 0, 169);
+  c2 = color(0, 247, 78);
 
-  strokeCol = color(113, 0, 194)
+  gui = new myGUI();
+  gui.add("rows", 50, 0, 500, 1)
+  gui.add("cols", 50, 0, 500, 1)
+  gui.add("noiseScale", .25, 0, 1, .00001);
+  gui.add("tWidthScale", .5, 0, 1, .00001);
+
+  // start();
+}
+
+function draw() {
+  // background(255);
+  clear()
+  handleKeys();
+
+  const x = map(mouseX, 0, width, 0, allColors.width);
+  const y = map(mouseY, 0, height, 0, allColors.height);
+
+  c1 = color(255,0)//allColors.get(x,allColors.height / 2);
+  c2 = color(255,0)//allColors.get(y,allColors.height / 2);
+
+  tWidth = width / gui.cols;
+  tHeight = height / gui.rows;
+
+  strokeCol = color(0)//color(113, 0, 194)
 
   const m = max(tWidth, tHeight);
   if (squareTiles) {
     tWidth = max(tWidth, m);
     tHeight = max(tHeight, m);
   }
-  // allColors.tint(255, opacity)
-
-  c1 = color(247, 0, 169);
-  c2 = color(0, 247, 78);
-
-  start();
-}
-
-function draw() {
-  // background(240);
-  handleKeys();
-
-  const x = map(mouseX, 0, width, 0, allColors.width);
-  const y = map(mouseY, 0, height, 0, allColors.height);
-
-  c1 = allColors.get(x,allColors.height / 2);
-  c2 = allColors.get(y,allColors.height / 2);
 
   start();
 
@@ -65,14 +67,12 @@ function draw() {
 
 function start() {
   const tiles = [
-    // Tile.createFromImage(t1, tWidth, tHeight),
-    // Tile.createFromImage(t2, tWidth, tHeight)
-    Tile.createFromFunction(tile => fromCircle2(tile, tWidth * tWidthScale), tWidth, tHeight),
-    Tile.createFromFunction(tile => fromCircle1(tile, tWidth * tWidthScale), tWidth, tHeight),
-    Tile.createFromFunction(tile => fromPlus1(tile, tWidth * tWidthScale), tWidth, tHeight),
-    Tile.createFromFunction(tile => fromPlus2(tile, tWidth * tWidthScale), tWidth, tHeight),
-    Tile.createFromFunction(tile => fromCircle1(tile, tWidth * tWidthScale), tWidth, tHeight),
-    Tile.createFromFunction(tile => fromCircle2(tile, tWidth * tWidthScale), tWidth, tHeight),
+    Tile.createFromFunction(tile => fromCircle2(tile, tWidth * gui.tWidthScale), tWidth, tHeight),
+    Tile.createFromFunction(tile => fromCircle1(tile, tWidth * gui.tWidthScale), tWidth, tHeight),
+    Tile.createFromFunction(tile => fromPlus1(tile, tWidth * gui.tWidthScale), tWidth, tHeight),
+    Tile.createFromFunction(tile => fromPlus2(tile, tWidth * gui.tWidthScale), tWidth, tHeight),
+    Tile.createFromFunction(tile => fromCircle1(tile, tWidth * gui.tWidthScale), tWidth, tHeight),
+    Tile.createFromFunction(tile => fromCircle2(tile, tWidth * gui.tWidthScale), tWidth, tHeight),
 
   ];
 
@@ -211,7 +211,7 @@ class TruchetTiles {
   chooseTile(x, y) {
     // const index = constrain(round(randomGaussian(.7, .2)), 0, 1);
     const scale = this.tiles.length;
-    const index = constrain(floor(scale * pow(noise(x * nScale + noiseOffset.x, y * nScale + noiseOffset.y, noiseOffset.time), 1)), 0, this.tiles.length - 1);
+    const index = constrain(floor(scale * pow(noise(x * gui.noiseScale + noiseOffset.x, y * gui.noiseScale + noiseOffset.y, noiseOffset.time), 1)), 0, this.tiles.length - 1);
     // print(index);
     return this.tiles[index];
   }

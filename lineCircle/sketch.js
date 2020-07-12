@@ -6,7 +6,7 @@ let gui, img;
 function keyPressed() {
   switch (keyCode) {
     case ALT:
-      saveSvg('out');
+      saveSvg('out', false);
       break;
     case SHIFT:
       noLoop();
@@ -52,7 +52,7 @@ function draw() {
       const center = createVector(col * gui.xSep, row * gui.ySep);
 
       // let n = pow(noise(center.x * gui.noiseScale, center.y * gui.noiseScale), gui.noisePow) - gui.noiseOffset;
-      
+
 
 
       let n = img.get(floor(col / gui.cols * img.width), floor(row / gui.rows * img.height));

@@ -9,12 +9,12 @@ let cols = 4;
 let xResolution;
 let yResolution;
 
-const programLength = 20;
+const programLength = 70;
 const mutateBy = 5;
 
 const useMusic = false;
 const useMic = true;
-const useBackgroundImage = true;
+const useBackgroundImage = false;
 const useBackgroundVideo = false;
 const useCamera = false;
 let backgroundImage;
@@ -32,6 +32,7 @@ let geneticShader;
 let music;
 let amplitude;
 let mousePos = {x: 0, y: 0};
+let animationPos = {x: 0, y: 0};
 let maximizeState = {};
 let isMaximized = false;
 
@@ -63,6 +64,8 @@ let symbols = [
   'y',
   'mouseX',
   'mouseY',
+  'animationPosX',
+  'animationPosY',
   'distFromMiddle',
   'time',
   'musicAmplitude',
@@ -120,7 +123,8 @@ function keyPressed(){
   switch (key) {
     case ' ':
       toggleMusic(); break;
-    case 't': time = 0; break;
+    case 't': time = 0; animationPos = {x:0, y:0}; break;
+
   }
 }
 
@@ -145,9 +149,10 @@ function mousePressed() {
 function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(displayWidth, displayHeight, WEBGL);
+  createCanvas(1920,1080, WEBGL)//displayWidth, displayHeight, WEBGL);
+  print(displayWidth, displayHeight, pixelDensity())
   recorder = new ScreenRecorder({
-    framerate: 10,
+    framerate: 48,
   });
   xResolution = width / cols;
   yResolution = height / rows;
@@ -219,6 +224,14 @@ function updateShader() {
   geneticShader = shaderLayer.createShader(geneticVert, compiled);
 }
 
+
+function updatePos() {
+  if (keyIsDown(87))  animationPos.y -= gui.speed * .01;
+  if (keyIsDown(65)) animationPos.x -= gui.speed * .01;
+  if (keyIsDown(83)) animationPos.y += gui.speed * .01;
+  if (keyIsDown(68)) animationPos.x += gui.speed * .01;
+}
+
 function draw() {
   background(0)
   // orbitControl();
@@ -234,10 +247,12 @@ function draw() {
     mousePos.x = mouseX;
     mousePos.y = mouseY;
   }
+
+  updatePos();
   // time += 0.01;
 
   const amp = amplitude.getLevel() || 0;
-  time += .01;
+  time += gui.timeSpeed * .01;
 
   let nyquist = 22050;
   spectralCentroid = fft.getCentroid();
@@ -249,6 +264,8 @@ function draw() {
   geneticShader.setUniform('musicAmplitude', amp);
   geneticShader.setUniform('mouseX', mousePos.x / width)
   geneticShader.setUniform('mouseY', mousePos.y / height)
+  geneticShader.setUniform('animationPosX', animationPos.x)
+  geneticShader.setUniform('animationPosY', animationPos.y)
   if (backgroundVideo && backgroundVideo.isReady)
     geneticShader.setUniform('backgroundImage', backgroundVideo);
   else if (cam)
@@ -294,6 +311,8 @@ function generateShader(containers) {
   uniform float musicCentroid;
   uniform float mouseX;
   uniform float mouseY;
+  uniform float animationPosX;
+  uniform float animationPosY;
 
 
   const float dist = 1.0;
@@ -632,6 +651,8 @@ class geneticGUI {
     this.addValue('mergeNtimes', 2, 0, 10, 1);
     this.addValue('xResolutionScale', cols, 0, 10);
     this.addValue('yResolutionScale', rows, 0, 10);
+    this.addValue('timeSpeed', 1, 0, 100, .00001);
+    this.addValue('speed', 1, 0, 100, .00001);
 
   }
 
