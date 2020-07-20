@@ -53,8 +53,8 @@ function setup() {
   gui = new GUI();
   gui.add("childrenRate", 2, 0, 10)
   gui.add("childrenSpread", .5, 0, 1);
-  gui.add("childDist", 3, 0, 100);
-  gui.add("closestChild", 2, 0, 100);
+  gui.add("childDist", 5, 0, 100);
+  gui.add("closestChild", 7, 0, 100);
   gui.add("energyUse", .01, 0, 1);
   gui.add("staticRatio", .2, 0, 1);
   gui.add("noiseScale", .1, 0, 1);
@@ -62,6 +62,7 @@ function setup() {
   gui.add("dirStrength", 0, -1, 1);
   gui.add("noiseMult", 0, -10, 10);
   gui.add("size", 500, 0, 5000);
+  gui.add("dirBias", 0, -PI, PI);
 
 
   start();
@@ -74,6 +75,7 @@ function draw() {
   // head.render();
   // print(head);
   // noLoop()
+  // clear()
   W.update();
   W.render()
 }
@@ -84,21 +86,35 @@ class World {
     this.all = []
   }
 
-  addNode(node) {
-    this.all.push(node);
-    this.tree.insert({
+  getNodePt(node) {
+    return {
       minX: node.pos.x,
       maxX: node.pos.x,
       minY: node.pos.y,
       maxY: node.pos.y,
       node
-    });
+    };
+  }
+
+  addNode(node) {
+    const nodePt = this.getNodePt(node)
+    this.all.push(nodePt);
+    this.tree.insert(nodePt);
   }
 
   getNearest(node) {
-    const nearest = knn(this.tree, node.pos.x, node.pos.y, 2)
-      .filter(p => p.node.id != node.parent.id)
-      .map(p => p.node)
+    // const nearest = knn(this.tree, node.pos.x, node.pos.y, 2)
+    //   .filter(p => p.node.id != node.parent.id)
+    //   .map(p => p.node)
+    const r = gui.closestChild/2;
+    const nearest = this.tree.search({
+      minX: node.pos.x - r,
+      maxX: node.pos.x + r,
+      minY: node.pos.y - r,
+      maxY: node.pos.y + r
+    })
+    .filter(p => p.node.id != node.parent.id)
+    .map(p => p.node)
 
     return nearest;
   }
@@ -107,23 +123,18 @@ class World {
 
     if (frameCount % 5 == 0) {
       this.tree.clear()
-      this.tree.load(this.all.map(node => ({
-        minX: node.pos.x,
-        maxX: node.pos.x,
-        minY: node.pos.y,
-        maxY: node.pos.y,
-        node
-      })))
+      this.tree.load(this.all);
     }
 
 
     for(let i = 0; i < this.all.length; i++) {
-      this.all[i].update();
+      this.all[i].node.update();
     }
   }
 
   render() {
-    this.all.forEach(n => {
+    this.all.forEach(npt => {
+      const n = npt.node;
       // stroke(n.energy * 255)
       if(n.parent && !n.rendered) {
         line(n.pos.x, n.pos.y, n.parent.pos.x, n.parent.pos.y)
@@ -151,12 +162,17 @@ class Node {
   //   // this.update();
   //   if (this.rendered) return;
 
-  //   this.children.forEach(node => {
-  //     stroke(node.energy * 255)
-  //     line(this.pos.x, this.pos.y, node.pos.x, node.pos.y);
-  //     node.render();
-  //   });
-  //   this.rendered = true;
+  //   vertex(this.pos.x, this.pos.y)
+
+  //   if (this.children.length == 0) {
+  //     endShape();
+  //     return
+  //   }
+  //   this.children[0].render();
+  //   for (let i = 1; i < this.children.length; i++) {
+  //     beginShape();
+  //     this.children[i].render();
+  //   }
   // }
 
   isStatic() {
@@ -176,6 +192,7 @@ class Node {
     const numChildren = ceil(gui.childrenRate * this.energy)
 
     const dir = this.pos.copy().sub(this.parent ? this.parent.pos : 0).normalize();
+    dir.rotate(gui.dirBias);
 
     // const n = (noise(this.pos.x * gui.noiseScale, this.pos.y * gui.noiseScale) + gui.noiseOffset) * gui.noiseMult;
     // const col = imgGet(img,floor(this.pos.x / width * img.width), floor(this.pos.y / height * img.height));

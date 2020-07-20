@@ -1,7 +1,7 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let containers;
 let fft;
-let gui;
+let gui, S;
 
 let rows = 4;
 let cols = 4;
@@ -124,6 +124,7 @@ function keyPressed(){
     case ' ':
       toggleMusic(); break;
     case 't': time = 0; animationPos = {x:0, y:0}; break;
+    case 'z': S = new ScrollScale; break
 
   }
 }
@@ -149,7 +150,9 @@ function mousePressed() {
 function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(1920,1080, WEBGL)//displayWidth, displayHeight, WEBGL);
+  createCanvas(displayWidth, displayHeight, WEBGL);
+  S = new ScrollScale()
+
   print(displayWidth, displayHeight, pixelDensity())
   recorder = new ScreenRecorder({
     framerate: 48,
@@ -266,6 +269,9 @@ function draw() {
   geneticShader.setUniform('mouseY', mousePos.y / height)
   geneticShader.setUniform('animationPosX', animationPos.x)
   geneticShader.setUniform('animationPosY', animationPos.y)
+  geneticShader.setUniform('scalePos', [S.pos.x, S.pos.y]);
+  geneticShader.setUniform("scale", S.scale)
+
   if (backgroundVideo && backgroundVideo.isReady)
     geneticShader.setUniform('backgroundImage', backgroundVideo);
   else if (cam)
@@ -283,9 +289,9 @@ function draw() {
   // shaderLayer.loadPixels();
   image(shaderLayer, 0, 0);
   // texture(shaderLayer)
-  // sphere(1000)
-  fill(255);
-  textSize(25)
+  // sphere(300)
+  // fill(255);
+  // textSize(25)
   // text(frameRate(), 10, 10);
 
   getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
@@ -313,6 +319,8 @@ function generateShader(containers) {
   uniform float mouseY;
   uniform float animationPosX;
   uniform float animationPosY;
+  uniform vec2 scalePos;
+  uniform float scale;
 
 
   const float dist = 1.0;
@@ -392,6 +400,12 @@ function generateShader(containers) {
     x /= ${(blockWidth).toFixed(10)};
     y /= ${(blockHeight).toFixed(10)};
     y = 1.0 - y;
+
+
+    x = (x - .5) * scale + scalePos.x;
+    y = (y - .5) * scale + scalePos.y;
+
+
     distFromMiddle = pow(x - 0.5, 2.0) + pow(y - 0.5, 2.0);
 
     ${gui['backgroundImageRed'] || gui['backgroundImageGreen'] || gui['backgroundImageBlue'] ?
@@ -654,6 +668,9 @@ class geneticGUI {
     this.addValue('timeSpeed', 1, 0, 100, .00001);
     this.addValue('speed', 1, 0, 100, .00001);
 
+    this.addValue("moveSpeed", 1, -100, 100);
+    this.addValue('scrollSpeed', .0003, -1, 1);
+    this.addValue('maxScrollSpeed', .5, -1, 1);
   }
 
   addValue(name, defaultVal, start, end) {
@@ -715,5 +732,48 @@ class geneticGUI {
       isMaximized = ! isMaximized;
       updateShader();
     }
+  }
+}
+
+
+function mouseWheel(event) {
+  S.handleScrollEvent(event)
+  return false;
+}
+class ScrollScale {
+  constructor() {
+    this.pos = createVector();
+    this.scale = 1;
+
+  }
+
+  handleScrollEvent(event) {
+    const delta = createVector(event.deltaX / width, event.deltaY / height).mult(-gui.moveSpeed);
+
+    const s = event.wheelDelta < 0 ? -1 : 1;
+
+    const scaleMove = min(gui.maxScrollSpeed, abs(event.wheelDelta) * gui.scrollSpeed);
+    if (!event.ctrlKey) {
+      this.pos.sub(delta.mult(this.scale));
+    } else {
+      const mousePos = createVector((event.x / width) % (1.0 / cols), (event.y / height) % (1 / rows));
+      const scaledMouse = this.scalePt(mousePos);
+      const mouseDiff = this.pos.copy().sub(scaledMouse);
+      this.pos.add(mouseDiff.mult(gui.scrollSpeed * 10 * s))
+      this.scale *= (1 - s * scaleMove);
+    }
+    // print({mousePos, delta, pos: this.pos, scale: this.scale})
+  }
+
+  render() {
+    stroke(0);
+    rectMode(CENTER);
+
+    rect(this.pos.x * width, this.pos.y * height, this.scale * width * .1, this.scale * height * .1)
+  }
+
+  scalePt(pt) {
+    // return pt.copy().mult(this.scale).add(this.pos);
+    return pt.copy().sub(.5,.5).mult(this.scale).add(this.pos)
   }
 }

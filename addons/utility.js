@@ -510,7 +510,7 @@ class ScreenRecorder {
 
 
 let boundingBoxRemoved = false;
-function saveSvg(fileName, optimize = true, removeAtt = ["path", 'fill', "stroke", "paint-order", 'stroke-opacity', 'stroke-linecap', 'stroke-miterlimit']) {
+function saveSvg(fileName, optimize = true, removeAtt = ["path", "stroke", "paint-order", 'stroke-opacity', 'stroke-linecap', 'stroke-miterlimit']) {
 
   if (optimize) {
     const group = window.document.getElementsByTagName('g')[1]
