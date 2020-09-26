@@ -35,6 +35,7 @@ let mousePos = {x: 0, y: 0};
 let animationPos = {x: 0, y: 0};
 let maximizeState = {};
 let isMaximized = false;
+let audioSetup = false;
 
 let operators = [
   '+',
@@ -150,7 +151,7 @@ function mousePressed() {
 function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
-  createCanvas(displayWidth, displayHeight, WEBGL);
+  let c = createCanvas(displayWidth, displayHeight, WEBGL);
   S = new ScrollScale()
 
   print(displayWidth, displayHeight, pixelDensity())
@@ -180,6 +181,17 @@ function setup() {
     music.start();
   }
 
+  c.mousePressed(() => {
+    if (audioSetup) return;
+    getAudioContext().resume()
+    audioSetup = true;
+    music = new p5.AudioIn();
+    music.start();
+    fft = new p5.FFT();
+    fft.setInput(music)
+    fft.smooth();
+  });
+
   if(!(useBackgroundImage || useBackgroundVideo || useCamera)) {
     symbols = symbols.filter(k => !k.includes("Image"));
     operators = operators.filter(k => !k.includes("Background"));
@@ -188,7 +200,7 @@ function setup() {
 
   gui = new geneticGUI(operators, symbols);
   noStroke();
-  frameRate(60);
+  // frameRate(60);
   // randomSeed(0);
   fft = new p5.FFT();
   fft.smooth();
@@ -255,6 +267,7 @@ function draw() {
   // time += 0.01;
 
   const amp = amplitude.getLevel() || 0;
+  // print(amp)
   time += gui.timeSpeed * .01;
 
   let nyquist = 22050;
@@ -297,6 +310,17 @@ function draw() {
   getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
   pop();
   recorder.takeFrame();
+}
+
+function gotSources(deviceList) {
+  if (deviceList.length > 0) {
+    //set the source to the first item in the deviceList array
+    audioIn.setSource(0);
+
+    let currentSource = deviceList[audioIn.currentSource];
+    print(deviceList)
+    print('set source to: ' + currentSource.deviceId, 5, 20, width);
+  }
 }
 
 

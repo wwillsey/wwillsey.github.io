@@ -29,7 +29,7 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight);
+  createCanvas(displayWidth, displayHeight, SVG);
   gui = new GUI();
 
   gui.add('camera_x', width/2, 0, width).onChange(redraw);

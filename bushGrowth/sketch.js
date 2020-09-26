@@ -63,6 +63,7 @@ function setup() {
   gui.add("noiseMult", 0, -10, 10);
   gui.add("size", 500, 0, 5000);
   gui.add("dirBias", 0, -PI, PI);
+  gui.add("branchSpeed", 0, -1, 1);
 
 
   start();
@@ -121,7 +122,7 @@ class World {
 
   update() {
 
-    if (frameCount % 5 == 0) {
+    if (frameCount % 50 == 0) {
       this.tree.clear()
       this.tree.load(this.all);
     }
@@ -182,7 +183,6 @@ class Node {
 
   update() {
     if (this.isStatic()) return;
-    const shouldSpawn = random() < .2;
     const newChildren = this.spawnChildren();
     if (newChildren.length > 0) this.lastUpdate = frameCount;
     this.children.push(...newChildren);
@@ -209,7 +209,7 @@ class Node {
     const spread = gui.childrenSpread //* n;
 
     return Array.from({length: numChildren}, () => {
-      const newDir = dir.copy().rotate(randomGaussian(0, spread))
+      const newDir = dir.copy().rotate(randomGaussian(0, spread + (frameCount - this.age) * gui.branchSpeed * .01))
       const dist = gui.childDist;
       const newPos = this.pos.copy().add(newDir.mult(dist));
       const newEnergy = this.energy - gui.energyUse;

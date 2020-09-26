@@ -1,11 +1,17 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let S, gui;
+let c;
+
+let shouldSave = false;
+
 function keyPressed() {
   switch (keyCode) {
     case ALT:
       // save('out','svg');
       // S.render()
+      // shouldSave = true;
       saveSvg('out')
+      redraw();
       break;
     case SHIFT:
       noLoop();
@@ -16,41 +22,16 @@ function keyPressed() {
 }
 
 function setup() {
-  createCanvas(displayWidth, displayHeight, SVG);
-  // c = createGraphics(displayWidth, displayHeight)
-
-  // svg = new SvgSavable(c);
-
-  noFill();
-  strokeWeight(1);
-  stroke(0);
+  setupCanvas(SVG);
 
   gui = new GUI();
   gui.add('steps', 10, 0, 20000).onFinishChange(redraw);
-  // gui.add('v0_mult', 1, 0, 1000,1).onChange(redraw);
-  // gui.add('v0_radius', 100, 0, 1000).onChange(redraw);
-  // gui.add('v0_radiusMod', 0, -10, 10).onChange(redraw);
-  // gui.add('v0_radiusFreq', 0, 0, 100,1).onChange(redraw);
+  gui.add('scale_x', 1, -100, 100).onFinishChange(redraw);
+  gui.add('scale_y', 1, -100, 100).onFinishChange(redraw);
 
-  // gui.add('v1_mult', 1, 0, 1000,1).onChange(redraw);
-  // gui.add('v1_radius', 100, 0, 1000).onChange(redraw);
-  // gui.add('v1_radiusMod', 0, -100, 100).onChange(redraw);
-  // gui.add('v1_radiusFreq', 0, 0, 100,1).onChange(redraw);
-
-
-  // gui.add('v2_x', 0, -1000, 1000).onChange(redraw);
-  // gui.add('v2_y', 0, -1000, 1000).onChange(redraw);
-  // gui.add('v3_noiseScale', .01, 0, 1, .001).onChange(redraw);
-  // gui.add('v3_noiseMult', 0, 0, 10).onChange(redraw);
-  // gui.add('f', 0, -1000, 1000, 1).onChange(redraw);
-  // gui.add('minD', 0, 0, 100, 1).onChange(redraw);
-  // gui.add('dPow', 0, 0, 10, .001).onChange(redraw);
-
-  gui.add('ptsSimplify', 0, 0, 1).onChange(redraw);
-  gui.add('roundTo', 0, 0, 1).onChange(redraw);
-  gui.add('close', false).onChange(redraw);
-
-  noLoop();
+  gui.add('ptsSimplify', 0, 0, 1).onFinishChange(redraw);
+  gui.add('roundTo', 0, 0, 1).onFinishChange(redraw);
+  gui.add('close', false).onFinishChange(redraw);
 
   S = new Spirograph(
     [
@@ -64,10 +45,18 @@ function setup() {
 }
 
 
+function setupCanvas(type) {
+  c = createCanvas(displayWidth, displayHeight, type);
+  noFill();
+  strokeWeight(1);
+  stroke(0);
+}
+
 function draw() {
+
   noLoop();
-  // background(255);
-  clear()
+  clear();
+
 
   // S = new Spirograph(
   // [
@@ -125,6 +114,7 @@ class Spirograph {
         totalHeading += val.heading();
       });
 
+      cursor.mult(gui.scale_x, gui.scale_y)
       cursor.add(width/2, height/2);
       return {x: cursor.x, y: cursor.y};
     });
@@ -189,14 +179,15 @@ let circleCount = 0;
 function addCircle(defaultR = 0) {
   const circleId = `circle_${circleCount++}`;
   const f = gui.addFolder(circleId);
-  f.add("radius", defaultR, 0, 1000).onChange(redraw)
-  f.add("speed", 1, -1000, 1000).onChange(redraw)
-  f.add("radiusFn", "").onChange(redraw);
-  f.add("n", 3, 1, 1000,1).onChange(redraw);
+  f.add("radius", defaultR, 0, 1000).onFinishChange(redraw)
+  f.add("speed", 1, -1000, 1000).onFinishChange(redraw)
+  f.add("radiusFn", "").onFinishChange(redraw);
+  f.add("n", 3, 1, 1000,1).onFinishChange(redraw);
 
 
   return (i) => {
     // return createVector(f.radius * (f.radiusFn != "" ? eval(f.radiusFn) : 1), 0).rotate(f.speed * i * TWO_PI);
+    if (f.radius == 0) return createVector()
     const th = TWO_PI * i;
     const r = cos(PI/f.n) / cos(th - TWO_PI / f.n * floor((f.n * th + PI) / TWO_PI));
     return createVector(r * f.radius * (f.radiusFn != "" ? eval(f.radiusFn) : 1), 0).rotate(th * f.speed)
@@ -207,11 +198,11 @@ let translateCount = 0;
 function addTranslate(x,y) {
   const translateId = `translate_${translateCount++}`;
   const f = gui.addFolder(translateId);
-  f.add("x", `${x ? x : '0'}`).onChange(redraw)
-  f.add("y", `${y ? y : '0'}`).onChange(redraw)
-  f.add("x2", f.x).onChange(redraw);
-  f.add("y2", f.x).onChange(redraw);
-  f.add("lerp", "0").onChange(redraw)
+  f.add("x", `${x ? x : '0'}`).onFinishChange(redraw)
+  f.add("y", `${y ? y : '0'}`).onFinishChange(redraw)
+  f.add("x2", f.x).onFinishChange(redraw);
+  f.add("y2", f.x).onFinishChange(redraw);
+  f.add("lerp", "0").onFinishChange(redraw)
 
 
   return (i) => {

@@ -31,8 +31,9 @@ function setup() {
   gui.add('roundTo', .1, 0, 10, .0001).onChange(redraw);
   gui.add('circleSize', 10, 0, 200, .0001).onChange(redraw);
   gui.add('circleLines', 1, 0, 20, 1).onChange(redraw);
-  gui.add('nLines', 5, 0, 100, 1).onChange(redraw);
+  gui.add('nLines', 0, 0, 100, 1).onChange(redraw);
   gui.add('lineSpread', 0, 0, 5, .00001).onChange(redraw);
+  gui.add('noiseScale', 1, 0, 10, .00001).onChange(redraw);
 
   const easeFn = gui.addFolder("easeFn")
   E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onChange(redraw))
@@ -40,7 +41,7 @@ function setup() {
   const easePt = gui.addFolder("easePt")
   E.listAlgos().forEach(a => easePt.add(a, a == 'linear').onChange(redraw))
 
-  fns = [swirl];
+  fns = [swirl, noiseSwirl];
   gui.add('fn', 0, 0, fns.length, 1).onChange(redraw);
 
   noFill();
@@ -54,6 +55,8 @@ function draw() {
 
   const fn = fns[gui.fn];
   drawGrid(fn);
+  // translate(gui.size * .5, gui.size * .5)
+  // drawGrid(fn);
   // drawGridRotateElement();
 }
 
@@ -95,7 +98,7 @@ function noiseSwirl(row, col) {
   let d = sqrt((p.x - .5)**2 + (p.y - .5)**2);
   d /= (sqrt(2) / 2);
   d -= gui.dSub;
-  const rotateAmt = d * applyEase(gui.easeFn, d * noise(p.x, p.y)) * gui.rotateAmt;
+  const rotateAmt = d * applyEase(gui.easeFn, d * noise(p.x  * gui.noiseScale, p.y* gui.noiseScale)) * gui.rotateAmt;
   // print(rotateAmt)
   p.sub(.5,.5).rotate(rotateAmt).add(.5,.5);
   // print(p)
