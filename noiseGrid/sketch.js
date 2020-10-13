@@ -34,6 +34,8 @@ function setup() {
   gui.add('nLines', 0, 0, 100, 1).onChange(redraw);
   gui.add('lineSpread', 0, 0, 5, .00001).onChange(redraw);
   gui.add('noiseScale', 1, 0, 10, .00001).onChange(redraw);
+  gui.add('drawBackground', false).onChange(redraw);
+  gui.add('modRotate', 2, 1, 100, 1).onChange(redraw);
 
   const easeFn = gui.addFolder("easeFn")
   E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onChange(redraw))
@@ -55,6 +57,10 @@ function draw() {
 
   const fn = fns[gui.fn];
   drawGrid(fn);
+
+  if(gui.drawBackground) {
+    drawGrid(noOp);
+  }
   // translate(gui.size * .5, gui.size * .5)
   // drawGrid(fn);
   // drawGridRotateElement();
@@ -89,6 +95,12 @@ function swirl(row, col) {
   const rotateAmt = d * applyEase(gui.easeFn, d) * gui.rotateAmt;
   // print(rotateAmt)
   p.sub(.5,.5).rotate(rotateAmt).add(.5,.5);
+  // print(p)
+  return p
+}
+
+function noOp(row, col) {
+  const p = getPt(row, col);
   // print(p)
   return p
 }
@@ -205,15 +217,14 @@ function lerpPaths(paths, pts) {
   noiseSeed(gui.dSub);
   for(let row = 0; row < gui.rows; row++) {
     for(let col = 0; col < gui.cols; col++) {
-      const rl = random() < .5;
+      // const rl = random() < .5;
+      const rl = (row * gui.rows + gui.cols * col) % gui.modRotate == 0
       let p1,p2,p3,p4;
       if (rl) {
         p1 = pts[row][col].copy()
         p2 = pts[row][col+1].copy()
         p3 = pts[row+1][col].copy()
         p4 = pts[row+1][col+1].copy()
-
-
       } else {
         p1 = pts[row][col].copy()
         p3 = pts[row][col+1].copy()
@@ -223,9 +234,9 @@ function lerpPaths(paths, pts) {
 
       const lines = gui.nLines;
         for (let i = 1; i < lines; i++) {
-          print(gui.lineSpread)
+          // print(gui.lineSpread)
           const v = (i / lines) + (gui.lineSpread > 0 ? randomGaussian(0, gui.lineSpread) : 0);
-          print(v)
+          // print(v)
           const ptA = p1.copy().mult(v).add(p2.copy().mult(1-v));
           const ptB = p3.copy().mult(v).add(p4.copy().mult(1-v));
 

@@ -9,6 +9,8 @@ function preload() {
 
 function setup() {
   const c = createCanvas(400, 400);
+  gui = new GUI();
+  gui.add("energyFn", "bass")
 
   c.mousePressed(() => {
     getAudioContext().resume()

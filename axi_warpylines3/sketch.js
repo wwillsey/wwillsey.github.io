@@ -48,7 +48,7 @@ function setup() {
   gui.add("pathMinLength", 0, 0, 1000, 1).onChange(redraw);
   gui.add("m", 0, 0, 10, .00001).onChange(updateField);
   gui.add("v1", 0, -2, 2, .00001).onChange(updateField);
-  gui.add("v2", 0, -2, 2, .00001).onChange(updateField);
+  gui.add("v2", 1, -2, 2, .00001).onChange(updateField);
   gui.add("stroke", 255, 0, 255, 1).onChange(updateField);
   gui.add("normalize", false).onChange(updateField);
 
@@ -159,10 +159,14 @@ function noiseFromCenter(x,y) {
 }
 
 function noiseField(x, y) {
+  x %= .5
+  y %= .5
+
   let z = gui.noiseT;
   let q = gui.noiseRotate;
   x = z*sin(q) + x*cos(q)
   z = z*cos(q) - x*sin(q)
+
 
 
   return noise(gui.noiseScale * x, gui.noiseScale * y, z) + gui.noiseOffset;

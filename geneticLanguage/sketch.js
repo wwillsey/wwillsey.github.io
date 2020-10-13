@@ -3,8 +3,8 @@ let containers;
 let fft;
 let gui, S;
 
-let rows = 4;
-let cols = 4;
+let rows = 3;
+let cols = 3;
 
 let xResolution;
 let yResolution;
@@ -12,8 +12,8 @@ let yResolution;
 const programLength = 70;
 const mutateBy = 5;
 
-const useMusic = false;
-const useMic = true;
+const useMusic = true;
+const useMic = false;
 const useBackgroundImage = false;
 const useBackgroundVideo = false;
 const useCamera = false;
@@ -92,6 +92,8 @@ void main() {
 }
 `;
 
+let musicLevelList = ["bass", "lowMid", "mid", "highMid", "treble"];
+
 
 function preload() {
   music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
@@ -118,16 +120,21 @@ function keyPressed(){
       recorder.toggle();
       break;
     case 93:
-      saveCanvas();
+      saveScreen()
       break;
   }
   switch (key) {
     case ' ':
       toggleMusic(); break;
     case 't': time = 0; animationPos = {x:0, y:0}; break;
-    case 'z': S = new ScrollScale; break
+    case 'z': S = new ScrollScale(); break
 
   }
+}
+
+function saveScreen() {
+  if (gui.renderScale == 1) saveCanvas();
+  else render(updateShaderLayer, gui.renderScale, S)
 }
 
 function toggleMusic() {
@@ -182,14 +189,17 @@ function setup() {
   }
 
   c.mousePressed(() => {
-    if (audioSetup) return;
-    getAudioContext().resume()
-    audioSetup = true;
-    music = new p5.AudioIn();
-    music.start();
-    fft = new p5.FFT();
-    fft.setInput(music)
-    fft.smooth();
+    if (useMusic) {
+      if (audioSetup) return;
+      getAudioContext().resume()
+      audioSetup = true;
+      music = new p5.AudioIn();
+      music.start();
+      fft = new p5.FFT();
+      fft.setInput(music)
+      fft.smooth();
+    }
+
   });
 
   if(!(useBackgroundImage || useBackgroundVideo || useCamera)) {
@@ -252,6 +262,25 @@ function draw() {
   // orbitControl();
   // shader() sets the active shader with our shader
   // fill(0)
+
+  shaderLayer = updateShaderLayer(S)
+  push();
+  translate(-width/2, -height/2);
+  // shaderLayer.loadPixels();
+  image(shaderLayer, 0, 0);
+  // texture(shaderLayer)
+  // sphere(300)
+  // fill(255);
+  // textSize(25)
+  // text(frameRate(), 10, 10);
+
+  getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
+  pop();
+  recorder.takeFrame();
+}
+
+
+function updateShaderLayer(zoomScale) {
   let spectrum = fft.analyze();
   shaderLayer.shader(geneticShader);
 
@@ -282,8 +311,8 @@ function draw() {
   geneticShader.setUniform('mouseY', mousePos.y / height)
   geneticShader.setUniform('animationPosX', animationPos.x)
   geneticShader.setUniform('animationPosY', animationPos.y)
-  geneticShader.setUniform('scalePos', [S.pos.x, S.pos.y]);
-  geneticShader.setUniform("scale", S.scale)
+  geneticShader.setUniform('scalePos', [zoomScale.pos.x, zoomScale.pos.y]);
+  geneticShader.setUniform("scale", zoomScale.scale)
 
   if (backgroundVideo && backgroundVideo.isReady)
     geneticShader.setUniform('backgroundImage', backgroundVideo);
@@ -292,24 +321,12 @@ function draw() {
   else if (backgroundImage)
     geneticShader.setUniform('backgroundImage', backgroundImage);
 
-  geneticShader.setUniform('energies', fft.linAverages(fftEnergies));
+  geneticShader.setUniform('energies', musicLevelList.map(s => gui[s] ? fft.getEnergy(s) : 0));
   geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
   geneticShader.setUniform('musicCentroid', map(log(mean_freq_index), 0, log(spectrum.length), 0, 1));
 
   shaderLayer.rect(0,0,width, height);
-  push();
-  translate(-width/2, -height/2);
-  // shaderLayer.loadPixels();
-  image(shaderLayer, 0, 0);
-  // texture(shaderLayer)
-  // sphere(300)
-  // fill(255);
-  // textSize(25)
-  // text(frameRate(), 10, 10);
-
-  getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
-  pop();
-  recorder.takeFrame();
+  return shaderLayer;
 }
 
 function gotSources(deviceList) {
@@ -337,7 +354,7 @@ function generateShader(containers) {
   uniform float time;
   uniform float musicAmplitude;
   uniform sampler2D backgroundImage;
-  uniform float energies[4];
+  uniform float energies[5];
   uniform float musicCentroid;
   uniform float mouseX;
   uniform float mouseY;
@@ -369,7 +386,7 @@ function generateShader(containers) {
   }
 
   float getEnergy(int i) {
-    for (int k = 0; k < 4; ++k) {
+    for (int k = 0; k < 5; ++k) {
       if (i == k) {
         return energies[k];
       }
@@ -483,12 +500,12 @@ function getRandomFrom(l, notThis) {
 
 function genTerm() {
   const rand = random();
-  if (rand < .1) {
+  if (rand < gui.randValChance) {
     // return `vec3(${random()}, ${random()}, ${random()})`;
     return `${random()}`;
 
   }
-  if (rand < .4) {
+  if (rand < gui.randSymbolChance) {
     return getRandomFrom(symbols)
   }
   return getRandomFrom(operators)
@@ -695,11 +712,17 @@ class geneticGUI {
     this.addValue("moveSpeed", 1, -100, 100);
     this.addValue('scrollSpeed', .0003, -1, 1);
     this.addValue('maxScrollSpeed', .5, -1, 1);
+    this.addValue('randValChance', .1, 0, 1);
+    this.addValue('randSymbolChance', .4, 0, 1);
+    this.addValue('renderScale', 1, 0, 100, 1);
+
+    let musicFolder = this.gui.addFolder("music");
+    musicLevelList.forEach(l => addRadio(l, musicFolder))
   }
 
-  addValue(name, defaultVal, start, end) {
+  addValue(name, defaultVal, start, end, incr) {
     this[name] = defaultVal;
-    this.gui.add(this, name, start, end);
+    this.gui.add(this, name, start, end, incr);
   }
 
   resetTime() {
