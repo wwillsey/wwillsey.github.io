@@ -96,9 +96,9 @@ let musicLevelList = ["bass", "lowMid", "mid", "highMid", "treble"];
 
 
 function preload() {
-  music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
+  // music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
-  backgroundImage = useBackgroundImage ? loadImage("../media/7525_22.jpg") : null;
+  // backgroundImage = useBackgroundImage ? loadImage("../media/7525_22.jpg") : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
 
 }
