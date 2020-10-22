@@ -10,7 +10,7 @@ let xResolution;
 let yResolution;
 
 const programLength = 70;
-const mutateBy = 5;
+const mutateBy = 10;
 
 const useMusic = true;
 const useMic = false;

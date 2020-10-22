@@ -22,8 +22,8 @@ function setup() {
   E = new p5.Ease();
 
   gui = new GUI();
-  gui.add('rows', 9, 0, 1000, 1).onChange(redraw);
-  gui.add('cols', 5, 0, 1000, 1).onChange(redraw);
+  gui.add('rows', 50, 0, 1000, 1).onChange(redraw);
+  gui.add('cols', 50, 0, 1000, 1).onChange(redraw);
   gui.add('size', 1000, 0, 10000, .0001).onChange(redraw);
   gui.add('rotateAmt', 0, 0, 100, .0000001).onChange(redraw);
   gui.add('dSub', 0, -1, 1, .0000001).onChange(redraw);
@@ -36,6 +36,9 @@ function setup() {
   gui.add('noiseScale', 1, 0, 10, .00001).onChange(redraw);
   gui.add('drawBackground', false).onChange(redraw);
   gui.add('modRotate', 2, 1, 100, 1).onChange(redraw);
+  gui.add('noiseDelta', 0.1, 0, 1).onChange(redraw);
+  gui.add('pushAmt', .1, -1, 1).onChange(redraw);
+
 
   const easeFn = gui.addFolder("easeFn")
   E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onChange(redraw))
@@ -43,7 +46,7 @@ function setup() {
   const easePt = gui.addFolder("easePt")
   E.listAlgos().forEach(a => easePt.add(a, a == 'linear').onChange(redraw))
 
-  fns = [swirl, noiseSwirl];
+  fns = [swirl, noiseSwirl, noisePush];
   gui.add('fn', 0, 0, fns.length, 1).onChange(redraw);
 
   noFill();
@@ -118,6 +121,17 @@ function noiseSwirl(row, col) {
 }
 
 
+function noisePush(row, col) {
+  const p = getPt(row, col);
+  const n = noise(p.x, p.y);
+  const dx = (noise((p.x + gui.noiseDelta) * gui.noiseScale, p.y * gui.noiseScale) -  n) + (n - noise((p.x - gui.noiseDelta)* gui.noiseScale, p.y* gui.noiseScale))
+  const dy = (noise(p.x * gui.noiseScale, (p.y + gui.noiseDelta) * gui.noiseScale) -  n) + (n - noise(p.x * gui.noiseScale, (p.y - gui.noiseDelta) * gui.noiseScale));
+
+  const v = swirl(row, col);
+  v.add(dx * gui.pushAmt, dy * gui.pushAmt);
+  return v;
+}
+
 function rotateForSwirlWithEase(row, col) {
   const p = getPt(row, col);
   let d = sqrt((p.x - .5)**2 + (p.y - .5)**2)
@@ -154,7 +168,13 @@ function drawGrid(fn) {
       pts[row][col] = p;
       // vertex(p.x, p.y);
     }
-    paths.addPath(pts[row]);
+
+    if (row / gui.rows >= .5) {
+    // paths.addPath(pts[row].slice(0, ceil(pts[row].length / 2)));
+    paths.addPath(pts[row])
+    } else {
+      paths.addPath(pts[row].slice(floor(pts[row].length / 2), pts[row].length));
+    }
 
     // endShape();
   }
@@ -162,12 +182,16 @@ function drawGrid(fn) {
   for(let col = 0; col <= gui.cols; col++) {
     // beginShape()
     const path = new Path();
-    for(let row = 0; row <= gui.rows; row++) {
+
+    const smallcol = col <= gui.cols/2
+    for(let row = (smallcol ? 0 : floor(gui.rows/2)); row <= (smallcol ? gui.rows / 2 : gui.rows) ; row++) {
       const p = pts[row][col];
       // vertex(p.x, p.y)
+      // if ()
       path.add(p)
     }
     paths.addPath(path);
+
     // endShape()
   }
 
@@ -178,7 +202,8 @@ function drawGrid(fn) {
   paths.render({
     optimize: {},
     simplify: {
-      simplifyTolerance: .1
+      simplifyTolerance: .05,
+      curve: true,
     }
   });
 }
@@ -232,7 +257,24 @@ function lerpPaths(paths, pts) {
         p4 = pts[row+1][col+1].copy()
       }
 
-      const lines = gui.nLines;
+      let quad = 0;
+      if (row >= gui.rows / 2) quad++;
+      if (col >= gui.cols / 2) quad+=2;
+
+      let lines;
+      switch (quad) {
+        case 0:
+          lines = round(gui.nLines / 3)
+          break;
+        case 1:
+        case 2:
+          lines = round(gui.nLines / 2)
+          break;
+        case 3:
+          lines = gui.nLines;
+        default:
+          break;
+      }
         for (let i = 1; i < lines; i++) {
           // print(gui.lineSpread)
           const v = (i / lines) + (gui.lineSpread > 0 ? randomGaussian(0, gui.lineSpread) : 0);
