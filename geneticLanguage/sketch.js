@@ -12,7 +12,7 @@ let yResolution;
 const programLength = 70;
 const mutateBy = 10;
 
-const useMusic = true;
+const useMusic = false;
 const useMic = false;
 const useBackgroundImage = false;
 const useBackgroundVideo = false;
@@ -99,7 +99,7 @@ function preload() {
   // music = useMusic ? loadSound('http://localhost:3000/geneticLanguage/sounds/static_snow.mp3') : null;
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
   // backgroundImage = useBackgroundImage ? loadImage("../media/7525_22.jpg") : null;
-  // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/colorWalk/done/colors (12).jpg') : null;
+  backgroundImage = useBackgroundImage ? loadImage('../media/flower.jpg') : null;
 
 }
 

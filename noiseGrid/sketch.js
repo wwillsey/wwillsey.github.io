@@ -3,10 +3,17 @@ let gui;
 let E;
 let w,h;
 let fns;
+
+
+let start = 0;
+let rendering = false;
+let noiseZ = 0;
+let randomOffset;
 function keyPressed() {
   switch (keyCode) {
     case ALT:
-      saveSvg('out');
+      renderAll();
+      // saveSvg('out');
       break;
     case SHIFT:
       noLoop();
@@ -16,28 +23,44 @@ function keyPressed() {
   }
 }
 
+function renderAll() {
+  // for(let i = 0; i < 50; i++) {
+  //   noiseZ = random() * 1000;
+  //   redraw();
+  //   // saveSvg('out');
+  // }
+  rendering = true;
+  start = frameCount;
+  loop();
+}
+
 function setup() {
-  createCanvas(displayWidth, displayHeight, SVG);
+  createCanvas(2000, 2000);
   noLoop();
   E = new p5.Ease();
+
+  randomOffset = createVector();
 
   gui = new GUI();
   gui.add('rows', 50, 0, 1000, 1).onChange(redraw);
   gui.add('cols', 50, 0, 1000, 1).onChange(redraw);
-  gui.add('size', 1000, 0, 10000, .0001).onChange(redraw);
-  gui.add('rotateAmt', 0, 0, 100, .0000001).onChange(redraw);
-  gui.add('dSub', 0, -1, 1, .0000001).onChange(redraw);
+  gui.add('size', 475, 0, 10000, .0001).onChange(redraw);
+  gui.add('rotateAmt', 3, 0, 100, .0000001).onChange(redraw);
+  gui.add('dSub', .82, -1, 1, .0000001).onChange(redraw);
   gui.add('strokeWeight', 1, 0, 10, .01).onChange(redraw);
   gui.add('roundTo', .1, 0, 10, .0001).onChange(redraw);
   gui.add('circleSize', 10, 0, 200, .0001).onChange(redraw);
   gui.add('circleLines', 1, 0, 20, 1).onChange(redraw);
   gui.add('nLines', 0, 0, 100, 1).onChange(redraw);
   gui.add('lineSpread', 0, 0, 5, .00001).onChange(redraw);
-  gui.add('noiseScale', 1, 0, 10, .00001).onChange(redraw);
+  gui.add('noiseScale', 1.5, 0, 10, .00001).onChange(redraw);
   gui.add('drawBackground', false).onChange(redraw);
   gui.add('modRotate', 2, 1, 100, 1).onChange(redraw);
   gui.add('noiseDelta', 0.1, 0, 1).onChange(redraw);
-  gui.add('pushAmt', .1, -1, 1).onChange(redraw);
+  gui.add('pushAmt', .25, -1, 1).onChange(redraw);
+  gui.add('case0', .3, -1, 1).onChange(redraw);
+  gui.add('case1_2', .5, -1, 1).onChange(redraw);
+  // gui.add('noiseZ', 0, -100, 100).onChange(redraw);
 
 
   const easeFn = gui.addFolder("easeFn")
@@ -47,18 +70,36 @@ function setup() {
   E.listAlgos().forEach(a => easePt.add(a, a == 'linear').onChange(redraw))
 
   fns = [swirl, noiseSwirl, noisePush];
-  gui.add('fn', 0, 0, fns.length, 1).onChange(redraw);
+  gui.add('fn', 2, 0, fns.length, 1).onChange(redraw);
 
   noFill();
+  frameRate(24)
+  randomSeed(0);
+  noiseSeed(0)
+  renderAll();
 }
 
 
+
 function draw() {
-  clear();
+  // clear();
   stroke(0);
   strokeWeight(gui.strokeWeight);
 
   const fn = fns[gui.fn];
+  if (rendering) {
+    // randomOffset = createVector(
+    //   random() * 1000,
+    //   random() * 1000
+    // );
+    let i = frameCount - start;
+    randomOffset = createVector(
+      floor(i / 6),
+      i % 6,
+
+    );
+    translate(randomOffset.x * gui.size  - width/2, randomOffset.y * gui.size  - height/2)
+  }
   drawGrid(fn);
 
   if(gui.drawBackground) {
@@ -67,6 +108,14 @@ function draw() {
   // translate(gui.size * .5, gui.size * .5)
   // drawGrid(fn);
   // drawGridRotateElement();
+  print('drawing', rendering, frameCount, start)
+  if (rendering && (frameCount - start) <= 36) {
+
+    // saveSvg('out_final');
+  } else {
+    noLoop();
+    rendering = false
+  }
 }
 
 
@@ -122,10 +171,10 @@ function noiseSwirl(row, col) {
 
 
 function noisePush(row, col) {
-  const p = getPt(row, col);
-  const n = noise(p.x, p.y);
-  const dx = (noise((p.x + gui.noiseDelta) * gui.noiseScale, p.y * gui.noiseScale) -  n) + (n - noise((p.x - gui.noiseDelta)* gui.noiseScale, p.y* gui.noiseScale))
-  const dy = (noise(p.x * gui.noiseScale, (p.y + gui.noiseDelta) * gui.noiseScale) -  n) + (n - noise(p.x * gui.noiseScale, (p.y - gui.noiseDelta) * gui.noiseScale));
+  const p = getPt(row, col).add(randomOffset)
+  const n = 0//noise(p.x * gui.noiseScale, p.y * gui.noiseScale, noiseZ);
+  const dx = (noise((p.x + gui.noiseDelta) * gui.noiseScale, p.y * gui.noiseScale, noiseZ) -  n) + (n - noise((p.x - gui.noiseDelta)* gui.noiseScale, p.y* gui.noiseScale, noiseZ))
+  const dy = (noise(p.x * gui.noiseScale, (p.y + gui.noiseDelta) * gui.noiseScale, noiseZ) -  n) + (n - noise(p.x * gui.noiseScale, (p.y - gui.noiseDelta) * gui.noiseScale, noiseZ));
 
   const v = swirl(row, col);
   v.add(dx * gui.pushAmt, dy * gui.pushAmt);
@@ -238,7 +287,7 @@ function drawElementWithRotation(row, col, rotateAmt) {
 
 
 function lerpPaths(paths, pts) {
-  randomSeed(gui.dSub);
+  // randomSeed(gui.dSub);
   noiseSeed(gui.dSub);
   for(let row = 0; row < gui.rows; row++) {
     for(let col = 0; col < gui.cols; col++) {
@@ -264,11 +313,11 @@ function lerpPaths(paths, pts) {
       let lines;
       switch (quad) {
         case 0:
-          lines = round(gui.nLines / 3)
+          lines = round(gui.nLines * gui.case0)
           break;
         case 1:
         case 2:
-          lines = round(gui.nLines / 2)
+          lines = round(gui.nLines * gui.case1_2)
           break;
         case 3:
           lines = gui.nLines;

@@ -1,5 +1,6 @@
 
 function render(drawFn, scale, initScale) {
+  noLoop()
   let img;
   for(let x = 0; x < scale; x ++) {
     for(let y = 0; y < scale; y ++) {
@@ -18,5 +19,6 @@ function render(drawFn, scale, initScale) {
       img.image(rendered, x * rendered.width, y * rendered.height);
     }
   }
+  loop()
   saveCanvas(img)
 }

@@ -654,6 +654,9 @@ class Path {
     if (opts.simplifyTolerance) {
       this.simplify(opts.simplifyTolerance)
     }
+    if(opts.roundTo) {
+      this.pts = this.pts.map(p => roundPt(p, opts.roundTo))
+    }
 
     if (this.pts.length == 2) {
       const start = this.getStartPt();
