@@ -7,8 +7,12 @@ const nX = 20;
 let spaceY, spaceX
 let gui, E;
 
+let colorMap;
+let svgOn = true
+
+
 function setup() {
-  createCanvas(displayWidth, displayHeight,SVG);
+  createCanvas(displayWidth, displayHeight, svgOn? SVG : undefined);
   noFill();
   // stroke('#ED225D');
   // stroke(0, 50);
@@ -17,28 +21,37 @@ function setup() {
 
   blendMode(REPLACE);
   gui = new GUI();
-  gui.add("w", 500, 0, 5000).onChange(redraw)
-  gui.add("h", 500, 0, 5000).onChange(redraw)
+  gui.add("w", 350 * 3, 0, 5000).onChange(redraw)
+  gui.add("h", 237*3, 0, 5000).onChange(redraw)
   gui.add('seed', .5, 0, 1).onChange(redraw)
   gui.add('displaceAmt', 500, 0, 2000).onChange(redraw)
   gui.add('octaves', 4, 1, 10).onChange(redraw)
   gui.add('falloff', .5, 0, 1).onChange(redraw)
   gui.add('scale', .005, 0, .01).onChange(redraw)
   gui.add('yScale', .005, 0, .01).onChange(redraw)
-  gui.add('nY', 20, 1, 200).onChange(redraw)
-  gui.add('nX', 100, 0, 1000, 1).onChange(redraw)
+  gui.add('nY', 250, 1, 5000).onChange(redraw)
+  gui.add('nX', 200, 0, 1000, 1).onChange(redraw)
   gui.add('randomAmt', 0, 0, 1).onChange(redraw)
   gui.add('iris', 0, 0, 200).onChange(redraw)
   gui.add('roundTo', .01, 0, 200).onChange(redraw)
-  gui.add('randomSpread', 10, 0, 200).onChange(redraw)
+  gui.add('randomSpread', .1, 0, 200).onChange(redraw)
   gui.add('modAmt', 1, -10, 10).onChange(redraw)
   gui.add('fn', "-pow((i*2-1),2) + 1").onFinishChange(redraw)
   gui.add('simplify', .1,0, 1).onChange(redraw)
+  gui.add('nColors', 2,0, 100, 1).onChange(redraw)
+  gui.add('colorFuzz', 0.1, 0, 5).onChange(redraw)
+  gui.add('minLineSize', 10, 0, 100).onChange(redraw)
+  gui.add('ySensitivity', 0, -50, 50).onChange(redraw)
+  gui.add('optimize', false).onChange(redraw)
+
 
 
   E = new p5.Ease();
   const easeFn = gui.addFolder("easeFn")
   E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onChange(redraw))
+
+  const colorEaseFn = gui.addFolder("colorEaseFn")
+  E.listAlgos().forEach(a => colorEaseFn.add(a, a == 'linear').onChange(redraw))
 
   frameRate(10)
 }
@@ -54,6 +67,8 @@ function keyPressed() {
 }
 
 function draw() {
+  colorMap = Array.from({length: gui.nColors}, () => color(random(255), random(255), random(255)))
+
   spaceY = gui.h;
   spaceX = gui.w;
   noiseSeed(round(gui.seed * 1000000));
@@ -70,6 +85,7 @@ function draw() {
   // ellipse(width/2, height/2, 400,400)
   let lines = []
   let yc = -1;
+  const colors = {}
   for(let y = 0; y < spaceY; y += spaceY / gui.nY) {
     yc += 1;
     lines.push([])
@@ -94,13 +110,15 @@ function draw() {
       }
     );
 
-    beginShape();
+    // canvas.ctx.save()
+    // canvas.ctx.__closestGroupOrSvg().appendChild(document.createElementNS("http://www.w3.org/2000/svg", "g"))
     // curveVertex(pts[0].x, pts[0].y);
 
     let off = false
+
     pts = pts.map((pt, i) => {
       let ptAbove =  yc > 0 ? lines[yc-1][i] : pt;
-      let turnOff = ptAbove.y - pt.y > 0;
+      let turnOff = ptAbove.y - pt.y > gui.ySensitivity;
       if (turnOff && off) {
         pt.off = true
       }
@@ -115,28 +133,94 @@ function draw() {
       return p
     })
 
-    off = false
-    simplify(pts, gui.simplify).forEach((pt,i) => {
-      if (pt.off && !off) {
-        vertex(pt.x + 100, pt.y + 100)
-        endShape();
-        off = true;
-        return;
-      }
-      if (pt.off && pts[i+1] && !pts[i+1].off) {
-        off = false;
-        beginShape();
-      }
-      if (!pt.off && off) {
-        off = false
-        beginShape();
-      }
-      if (off) return
-      vertex(pt.x + 100, pt.y + 100)
-    });
-    // curveVertex(pts[pts.length-1].x, pts[pts.length-1].y);
-    endShape();
+    const v = max(min(yc / gui.nY + randomGaussian(0, gui.colorFuzz), .999), 0);
+    const colorVal = floor(applyEase(gui.colorEaseFn, v) * gui.nColors);
+    if (!colors[colorVal]) {
+      colors[colorVal] = []
+    }
+    colors[colorVal].push({
+      pts,
+      colorVal, yc
+    })
   }
+
+
+  Object.entries(colors).forEach(([cv, c]) => {
+    if (svgOn) canvas.ctx.save()
+
+    c.forEach(({pts, colorVal, yc}) => {
+
+      stroke(colorMap[colorVal]);
+
+      let off = false
+      // pts = pts.map((pt, i) => {
+      //   let ptAbove =  yc > 0 ? lines[yc-1][i] : pt;
+      //   let turnOff = ptAbove.y - pt.y > 0;
+      //   if (turnOff && off) {
+      //     pt.off = true
+      //   }
+      //   if (!turnOff && off) {
+      //     pts[i-1].off = false
+      //   }
+      //   off = turnOff
+
+      //   pt.y = max(ptAbove.y, pt.y)
+      //   const p = roundPt(pt, gui.roundTo)
+      //   lines[yc].push(p)
+      //   return p
+      // })
+
+      off = false
+      // beginShape();
+      const finalPts = [[]]
+      simplify(pts, gui.simplify).forEach((pt,i) => {
+        if (pt.off && !off) {
+          // vertex(pt.x + 100, pt.y + 100)
+          finalPts[finalPts.length - 1].push(createVector(pt.x + 100, pt.y + 100))
+          finalPts.push([])
+          off = true;
+          return;
+        }
+        if (pt.off && pts[i+1] && !pts[i+1].off) {
+          off = false;
+          beginShape();
+          finalPts.push([])
+        }
+        if (!pt.off && off) {
+          off = false
+          beginShape();
+          finalPts.push([])
+        }
+        if (off) return
+        // vertex(pt.x + 100, pt.y + 100)
+        finalPts[finalPts.length - 1].push(createVector(pt.x + 100, pt.y + 100))
+      });
+      // curveVertex(pts[pts.length-1].x, pts[pts.length-1].y);
+      // endShape();
+
+      const pc = new PathCollection();
+      finalPts.forEach(pts => {
+        if (pts.length == 0) return;
+        if (pts[0].dist(pts[pts.length-1]) < gui.minLineSize) return
+        // beginShape()
+        // pts.forEach(pt => vertex(pt.x, pt.y))
+        // endShape()
+        pc.addPath(pts);
+      })
+      pc.render({
+        optimize: gui.optimize,
+        simplify: {
+          simplifyTolerance: false,
+          roundTo: false
+        }
+      });
+    })
+
+    if(svgOn)
+      canvas.ctx.restore()
+
+  })
+  // print(colors)
 }
 
 function drawLine(start, end, displace) {
@@ -161,10 +245,11 @@ function drawLine(start, end, displace) {
 let easeCache = {}
 
 function applyEase(folder, val) {
+  return val;
 
   for(let i = 0; i < Object.keys(folder).length; i++) {
     if(folder[Object.keys(folder)[i]] == true) {
-      return E[Object.keys(folder)[i]](val);
+      // return E[Object.keys(folder)[i]](val);
       if (!easeCache[Object.keys(folder)[i]]) {
         easeCache[Object.keys(folder)[i]] = {}
       }
@@ -177,5 +262,24 @@ function applyEase(folder, val) {
       easeCache[Object.keys(folder)[i]][val] = v;
       return v;
     }
+  }
+}
+
+function handleKeys() {
+  if (keyIsDown(LEFT_ARROW)) {
+    xoffset -= gui.xSpeed * scale;
+  }
+
+  if (keyIsDown(RIGHT_ARROW)) {
+    yoffset += gui.xSpeed * scale;
+  }
+
+  if (keyIsDown(UP_ARROW)) {
+  }
+
+  if (keyIsDown(DOWN_ARROW)) {
+  }
+
+  if (keyIsDown(ENTER)) {
   }
 }
