@@ -1,4 +1,6 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
+p5.disableFriendlyErrors = true; // disables FES
+
 let containers;
 let fft;
 let gui, S;
@@ -10,7 +12,7 @@ let xResolution;
 let yResolution;
 
 const programLength = 70;
-const mutateBy = 10;
+const mutateBy = 15;
 
 const useMusic = false;
 const useMic = false;
@@ -20,7 +22,8 @@ const useCamera = false;
 let backgroundImage;
 let backgroundVideo;
 let cam;
-
+let font;
+let colorTransforms = "";
 
 let recorder;
 
@@ -58,7 +61,7 @@ let operators = [
   'max',
   'min',
   'exp',
-  'log'
+  'log',
 ];
 let symbols = [
   'x',
@@ -70,7 +73,6 @@ let symbols = [
   'distFromMiddle',
   'time',
   'musicAmplitude',
-  'musicCentroid',
   'backgroundImageRed',
   'backgroundImageGreen',
   'backgroundImageBlue',
@@ -100,7 +102,10 @@ function preload() {
   // backgroundImage = useBackgroundImage ? loadImage('http://localhost:3000/geneticLanguage/images/desert.jpeg') : null;
   // backgroundImage = useBackgroundImage ? loadImage("../media/7525_22.jpg") : null;
   backgroundImage = useBackgroundImage ? loadImage('../media/flower.jpg') : null;
-
+  font = loadFont("../addons/Inconsolata-Black.otf");
+  loadStrings("../addons/ColorSpaces.txt", (strs) => {
+    colorTransforms =  strs.join('\n')
+  })
 }
 
 
@@ -159,7 +164,11 @@ function setup() {
   // shaders require WEBGL mode to work
   // createCanvas(windowWidth, windowHeight, WEBGL);
   let c = createCanvas(displayWidth, displayHeight, WEBGL);
+
   S = new ScrollScale()
+  pixelDensity(1)
+  noSmooth()
+  frameRate(48);
 
   print(displayWidth, displayHeight, pixelDensity())
   recorder = new ScreenRecorder({
@@ -168,6 +177,7 @@ function setup() {
   xResolution = width / cols;
   yResolution = height / rows;
   shaderLayer = createGraphics(width, height, WEBGL);
+  shaderLayer.pixelDensity(2)
   if (useBackgroundVideo) {
     backgroundVideo = createVideo('./videos/breath_ctrl (loop).mp4', () => {
       backgroundVideo.loop();
@@ -210,7 +220,6 @@ function setup() {
 
   gui = new geneticGUI(operators, symbols);
   noStroke();
-  // frameRate(60);
   // randomSeed(0);
   fft = new p5.FFT();
   fft.smooth();
@@ -247,6 +256,8 @@ function updateShader() {
   const compiled = generateShader(containersForGen);
   print(compiled.split('\n').map((v,i) => `${i+1}:  ${v}`).join('\n'))
   geneticShader = shaderLayer.createShader(geneticVert, compiled);
+  shaderLayer.shader(geneticShader);
+
 }
 
 
@@ -277,12 +288,15 @@ function draw() {
   getSelectedContainers().forEach(c => c.renderSelectionHighlighting());
   pop();
   recorder.takeFrame();
+  // fill(200, 200, 200)
+  // textFont(font, 36);
+  // text(frameRate(), 0, 0)
 }
 
 
 function updateShaderLayer(zoomScale) {
-  let spectrum = fft.analyze();
-  shaderLayer.shader(geneticShader);
+  // let spectrum = fft.analyze();
+  // shaderLayer.shader(geneticShader);
 
   if(isMaximized) {
     mousePos.x += movedX;
@@ -293,16 +307,10 @@ function updateShaderLayer(zoomScale) {
   }
 
   updatePos();
-  // time += 0.01;
 
   const amp = amplitude.getLevel() || 0;
   // print(amp)
   time += gui.timeSpeed * .01;
-
-  let nyquist = 22050;
-  spectralCentroid = fft.getCentroid();
-  let mean_freq_index = spectralCentroid/(nyquist/spectrum.length);
-
 
   geneticShader.setUniform('resolution', [width, height]);
   geneticShader.setUniform('time', time);
@@ -321,9 +329,11 @@ function updateShaderLayer(zoomScale) {
   else if (backgroundImage)
     geneticShader.setUniform('backgroundImage', backgroundImage);
 
-  geneticShader.setUniform('energies', musicLevelList.map(s => gui[s] ? fft.getEnergy(s) : 0));
+
+  if (useMusic || useMic) {
+    geneticShader.setUniform('energies', musicLevelList.map(s =>   gui[s]) ? fft.getEnergy(s) : 0);
+  }
   geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
-  geneticShader.setUniform('musicCentroid', map(log(mean_freq_index), 0, log(spectrum.length), 0, 1));
 
   shaderLayer.rect(0,0,width, height);
   return shaderLayer;
@@ -350,12 +360,13 @@ function generateShader(containers) {
   return `
   precision highp float;
   varying vec2 vTexCoord;
+  #define saturate(v) clamp(v, 0, 1)
+
 
   uniform float time;
   uniform float musicAmplitude;
   uniform sampler2D backgroundImage;
   uniform float energies[5];
-  uniform float musicCentroid;
   uniform float mouseX;
   uniform float mouseY;
   uniform float animationPosX;
@@ -367,6 +378,18 @@ function generateShader(containers) {
   const float dist = 1.0;
   const vec2 stepSize = 0.0005 * vec2(${blockWidth / xResolution}, ${blockHeight / yResolution});
   const vec2 resolution = vec2(${width}.0, ${height}.0);
+
+  // Converts from pure Hue to linear RGB
+  vec3 hue_to_rgb(float hue) {
+    float R = abs(hue * 6.0 - 3.0) - 1.0;
+    float G = 2.0 - abs(hue * 6.0 - 2.0);
+    float B = 2.0 - abs(hue * 6.0 - 4.0);
+    return clamp(vec3(R,G,B), 0.0, 1.0);
+  }
+  vec3 hsv_to_rgb(vec3 hsv) {
+      vec3 rgb = hue_to_rgb(hsv.x);
+      return ((rgb - 1.0) * hsv.y + 1.0) * hsv.z;
+  }
 
   vec3 rgb(float r, float g, float b){
     return vec3(r / 255.0, g / 255.0, b / 255.0);
@@ -415,8 +438,6 @@ function generateShader(containers) {
     vec3 p = abs(fract(c.xxx + K.xyz) * 6.0 - K.www);
     return c.z * mix(K.xxx, clamp(p - K.xxx, 0.0, 1.0), c.y);
   }
-
-
 
   void main() {
     float none = 0.0;
@@ -474,6 +495,7 @@ function generateShader(containers) {
 
     ${containerExpsCompiled.join('\n')}
 
+    ${gui.hsv ? "scene = hsv_to_rgb(scene);" : ""}
     gl_FragColor = vec4(scene, 1.0);
   }`;
 }
@@ -681,8 +703,8 @@ class geneticGUI {
     const operatorFolder = this.gui.addFolder('Operators');
     const symbolFolder = this.gui.addFolder('Symbols');
 
-    const addRadio = (op, folder) => {
-      this[op] = true;
+    const addRadio = (op, folder, init = true) => {
+      this[op] = init;
       const controller = folder.add(this, op);
       controller.onFinishChange(updateContainerExps);
       controller.domElement.parentNode.children[0].setAttribute("style", "float:left; width:90%")
@@ -703,7 +725,7 @@ class geneticGUI {
 
     this.addValue('mutateBy', mutateBy, 0, 100, 1);
     this.addValue('mutateChance', .7, 0, 1);
-    this.addValue('mergeNtimes', 2, 0, 10, 1);
+    this.addValue('mergeNtimes', 3, 0, 10, 1);
     this.addValue('xResolutionScale', cols, 0, 10);
     this.addValue('yResolutionScale', rows, 0, 10);
     this.addValue('timeSpeed', 1, 0, 100, .00001);
@@ -718,6 +740,9 @@ class geneticGUI {
 
     let musicFolder = this.gui.addFolder("music");
     musicLevelList.forEach(l => addRadio(l, musicFolder))
+
+    let colorFolder = this.gui.addFolder("colors");
+    addRadio("hsv", colorFolder, false)
   }
 
   addValue(name, defaultVal, start, end, incr) {
