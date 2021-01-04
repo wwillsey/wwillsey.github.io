@@ -6,6 +6,8 @@ let gui, E;
 let colorMap;
 let svgOn = true
 
+let centerOffset;
+
 let rawPts;
 
 function setup() {
@@ -18,36 +20,37 @@ function setup() {
 
   blendMode(REPLACE);
   gui = new GUI();
-  gui.add("w", 900, 0, 5000).onChange(redraw)
-  gui.add("h", 400, 0, 5000).onChange(redraw)
-  gui.add('seed', 0, 0, 1).onChange(redraw)
-  gui.add('displaceAmt', 500, 0, 2000).onChange(redraw)
-  gui.add('octaves', 4, 1, 10).onChange(redraw)
-  gui.add('falloff', .5, 0, 1).onChange(redraw)
-  gui.add('scale', .005, 0, .01).onChange(redraw)
-  gui.add('yScale', .005, 0, .01).onChange(redraw)
-  gui.add('nY', 200, 1, 5000).onChange(redraw)
-  gui.add('nX', 250, 0, 1000, 1).onChange(redraw)
-  gui.add('roundTo', .01, 0, 200).onChange(redraw)
-  gui.add('randomSpread', 0, 0, 200).onChange(redraw)
+
+  gui.add("width", 900, 0, 5000).onFinishChange(redraw)
+  gui.add("height", 400, 0, 5000).onFinishChange(redraw)
+  gui.add('nY', 200, 1, 5000).onFinishChange(redraw)
+  gui.add('nX', 300, 0, 1000, 1).onFinishChange(redraw)
+  gui.add('seed', 0, 0, 1).onFinishChange(redraw)
+  gui.add('displaceAmt', 500, 0, 2000).onFinishChange(redraw)
+  gui.add('octaves', 4, 1, 10).onFinishChange(redraw)
+  gui.add('falloff', .5, 0, 1).onFinishChange(redraw)
+  gui.add('xScale', 3, 0, 100).onFinishChange(redraw)
+  gui.add('yScale', 3, 0, 100).onFinishChange(redraw)
+  gui.add('roundTo', .01, 0, 200).onFinishChange(redraw)
+  gui.add('randomSpread', 0, 0, 200).onFinishChange(redraw)
   gui.add('fn', "-pow((i*2-1),2) + 1").onFinishChange(redraw)
-  gui.add('simplify', .1,0, 1).onChange(redraw)
-  gui.add('nColors', 1,0, 100, 1).onChange(redraw)
-  gui.add('colorFuzz', 0.1, 0, 5).onChange(redraw)
-  gui.add('minLineSize', 10, 0, 100).onChange(redraw)
-  gui.add('ySensitivity', 0, -50, 50).onChange(redraw)
-  gui.add('optimize', false).onChange(redraw)
-  gui.add('stopPass', false).onChange(redraw)
+  gui.add('simplify', .1,0, 1).onFinishChange(redraw)
+  gui.add('nColors', 1,0, 100, 1).onFinishChange(redraw)
+  gui.add('colorFuzz', 0.1, 0, 5).onFinishChange(redraw)
+  gui.add('minLineSize', 10, 0, 100).onFinishChange(redraw)
+  gui.add('ySensitivity', 0, -50, 50).onFinishChange(redraw)
+  gui.add('optimize', false).onFinishChange(redraw)
+  gui.add('stopPass', false).onFinishChange(redraw)
   gui.add('save as SVG', () => {saveSvg("out")})
   gui.add('save as JSON', () => {saveJSON(getJson(), "json_out.json")})
-
+  gui.add('oneLine', false).onFinishChange(redraw)
 
   E = new p5.Ease();
   const easeFn = gui.addFolder("easeFn")
-  E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onChange(redraw))
+  E.listAlgos().forEach(a => easeFn.add(a, a == 'linear').onFinishChange(redraw))
 
   const colorEaseFn = gui.addFolder("colorEaseFn")
-  E.listAlgos().forEach(a => colorEaseFn.add(a, a == 'linear').onChange(redraw))
+  E.listAlgos().forEach(a => colorEaseFn.add(a, a == 'linear').onFinishChange(redraw))
 
   frameRate(10)
 }
@@ -68,8 +71,11 @@ function getJson() {
 
 function draw() {
 
-  let spaceY = gui.h;
-  let spaceX = gui.w;
+  centerOffset = createVector(
+    (width - gui.width) / 2,
+    (height - gui.height) / 2);
+  let spaceY = gui.height;
+  let spaceX = gui.width;
   noiseSeed(round(gui.seed * 1000000));
   randomSeed(round(gui.seed * 1000000))
   colorMap = Array.from({length: gui.nColors}, () => color(random(255), random(255), random(255)))
@@ -95,7 +101,7 @@ function draw() {
       createVector(spaceX,  y2),
       (pt, i) => {
 
-        const n = noise(pt.x * gui.scale, pt.y * gui.yScale);
+        const n = noise(pt.x * gui.xScale / 1000, pt.y * gui.yScale / 1000);
         const d = eval(gui.fn);
         return createVector(0, (.5 - n) * gui.displaceAmt * d);
       }
@@ -141,6 +147,9 @@ function draw() {
   Object.entries(colors).forEach(([cv, c]) => {
     if (svgOn) canvas.ctx.save()
 
+    let allPts = []
+    let forward = true;
+    const pc = new PathCollection();
     c.forEach(({pts, colorVal, yc}) => {
 
       stroke(colorMap[colorVal]);
@@ -168,8 +177,7 @@ function draw() {
       const finalPts = [[]]
       simplify(pts, gui.simplify).forEach((pt,i) => {
         if (pt.off && !off) {
-          // vertex(pt.x + 100, pt.y + 100)
-          finalPts[finalPts.length - 1].push(createVector(pt.x + 100, pt.y + 100))
+          finalPts[finalPts.length - 1].push(createVector(pt.x, pt.y).add(centerOffset))
           finalPts.push([])
           off = true;
           return;
@@ -185,31 +193,38 @@ function draw() {
           finalPts.push([])
         }
         if (off) return
-        // vertex(pt.x + 100, pt.y + 100)
-        finalPts[finalPts.length - 1].push(createVector(pt.x + 100, pt.y + 100))
+        finalPts[finalPts.length - 1].push(createVector(pt.x, pt.y).add(centerOffset))
       });
       // curveVertex(pts[pts.length-1].x, pts[pts.length-1].y);
       // endShape();
 
-      const pc = new PathCollection();
+
       finalPts.forEach(pts => {
         if (pts.length == 0) return;
         if (pts[0].dist(pts[pts.length-1]) < gui.minLineSize) return
         rawPts.push(pts.map(pt => ({
-          x: (pt.x - 100) / gui.w,
-          y: (pt.y - 100) / gui.h
+          x: (pt.x - centerOffset.x) / gui.width,
+          y: (pt.y - centerOffset.y) / gui.height
         })))
 
-        pc.addPath(pts);
-      })
-      pc.render({
-        optimize: gui.optimize,
-        simplify: {
-          simplifyTolerance: false,
-          roundTo: false
+        if (gui.oneLine) {
+          allPts.push(...(forward ? pts : reverse(pts)))
+        } else {
+          pc.addPath(pts);
         }
-      });
+      })
+      forward = !forward;
     })
+    if (gui.oneLine) {
+      pc.addPath(allPts)
+    }
+    pc.render({
+      optimize: gui.optimize,
+      simplify: {
+        simplifyTolerance: false,
+        roundTo: false
+      }
+    });
 
     if(svgOn)
       canvas.ctx.restore()
