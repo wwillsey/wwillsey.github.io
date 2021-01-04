@@ -21456,6 +21456,7 @@ p5.prototype.endRecord  = function() {
     this.write = function(data) {
       this.content += data;
     };
+    this.flush = function() { this.content = ''; };
     /**
      * Writes data to the PrintWriter stream, and adds a new line at the end
      * @method print
@@ -21497,6 +21498,10 @@ p5.prototype.endRecord  = function() {
      * </div>
      */
     this.print = function(data) {
+      this.content += data + "\n";
+    };
+
+    this.println = function(data) {
       this.content += data + '\n';
     };
     /**

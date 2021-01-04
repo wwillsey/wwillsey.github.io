@@ -1,15 +1,12 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 
 let n;
-const displaceAmt = 500;
-const nY = 20;
-const nX = 20;
-let spaceY, spaceX
 let gui, E;
 
 let colorMap;
 let svgOn = true
 
+let rawPts;
 
 function setup() {
   createCanvas(displayWidth, displayHeight, svgOn? SVG : undefined);
@@ -21,29 +18,28 @@ function setup() {
 
   blendMode(REPLACE);
   gui = new GUI();
-  gui.add("w", 350 * 3, 0, 5000).onChange(redraw)
-  gui.add("h", 237*3, 0, 5000).onChange(redraw)
-  gui.add('seed', .5, 0, 1).onChange(redraw)
+  gui.add("w", 900, 0, 5000).onChange(redraw)
+  gui.add("h", 400, 0, 5000).onChange(redraw)
+  gui.add('seed', 0, 0, 1).onChange(redraw)
   gui.add('displaceAmt', 500, 0, 2000).onChange(redraw)
   gui.add('octaves', 4, 1, 10).onChange(redraw)
   gui.add('falloff', .5, 0, 1).onChange(redraw)
   gui.add('scale', .005, 0, .01).onChange(redraw)
   gui.add('yScale', .005, 0, .01).onChange(redraw)
-  gui.add('nY', 250, 1, 5000).onChange(redraw)
-  gui.add('nX', 200, 0, 1000, 1).onChange(redraw)
-  gui.add('randomAmt', 0, 0, 1).onChange(redraw)
-  gui.add('iris', 0, 0, 200).onChange(redraw)
+  gui.add('nY', 200, 1, 5000).onChange(redraw)
+  gui.add('nX', 250, 0, 1000, 1).onChange(redraw)
   gui.add('roundTo', .01, 0, 200).onChange(redraw)
-  gui.add('randomSpread', .1, 0, 200).onChange(redraw)
-  gui.add('modAmt', 1, -10, 10).onChange(redraw)
+  gui.add('randomSpread', 0, 0, 200).onChange(redraw)
   gui.add('fn', "-pow((i*2-1),2) + 1").onFinishChange(redraw)
   gui.add('simplify', .1,0, 1).onChange(redraw)
-  gui.add('nColors', 2,0, 100, 1).onChange(redraw)
+  gui.add('nColors', 1,0, 100, 1).onChange(redraw)
   gui.add('colorFuzz', 0.1, 0, 5).onChange(redraw)
   gui.add('minLineSize', 10, 0, 100).onChange(redraw)
   gui.add('ySensitivity', 0, -50, 50).onChange(redraw)
   gui.add('optimize', false).onChange(redraw)
-
+  gui.add('stopPass', false).onChange(redraw)
+  gui.add('save as SVG', () => {saveSvg("out")})
+  gui.add('save as JSON', () => {saveJSON(getJson(), "json_out.json")})
 
 
   E = new p5.Ease();
@@ -66,13 +62,18 @@ function keyPressed() {
   }
 }
 
-function draw() {
-  colorMap = Array.from({length: gui.nColors}, () => color(random(255), random(255), random(255)))
+function getJson() {
+  return rawPts
+}
 
-  spaceY = gui.h;
-  spaceX = gui.w;
+function draw() {
+
+  let spaceY = gui.h;
+  let spaceX = gui.w;
   noiseSeed(round(gui.seed * 1000000));
   randomSeed(round(gui.seed * 1000000))
+  colorMap = Array.from({length: gui.nColors}, () => color(random(255), random(255), random(255)))
+
   noiseDetail(gui.octaves, gui.falloff);
   // background(255);
   clear()
@@ -81,31 +82,21 @@ function draw() {
   //   noLoop();
   // }
 
-  // ellipse(width/2, height/2, gui.iris * 2, gui.iris * 2)
-  // ellipse(width/2, height/2, 400,400)
   let lines = []
   let yc = -1;
   const colors = {}
   for(let y = 0; y < spaceY; y += spaceY / gui.nY) {
     yc += 1;
     lines.push([])
-    // print(`${y}, ${spaceY}, ${y / spaceY}`)
-    // const p1 = createVector(200, 0).rotate(y/spaceY * TWO_PI + (gui.randomAmt ? randomGaussian(0, gui.randomAmt) : 0)).add(width/2, height/2);
-    // const p2 = createVector(gui.iris, 0).rotate(y/spaceY * TWO_PI + (gui.randomAmt ? randomGaussian(0, gui.randomAmt) : 0)).add(width/2, height/2);
-    let y2 = (y + randomGaussian(0, gui.randomSpread));
-    y2 = y2 - y2%(spaceY / gui.nY * gui.modAmt);
+    let y2 = (y + (gui.randomSpread > 0 ? randomGaussian(0, gui.randomSpread) : 0));
     y2 = min(max(y2, 0), spaceY)
     let pts = drawLine(
       createVector(0, y),
       createVector(spaceX,  y2),
-      // p1, p2,
       (pt, i) => {
-        // noiseSeed(gui.noiseSeed);
 
         const n = noise(pt.x * gui.scale, pt.y * gui.yScale);
-        // const d = -pow((i*2-1),2) + 1;
         const d = eval(gui.fn);
-        // print(d)
         return createVector(0, (.5 - n) * gui.displaceAmt * d);
       }
     );
@@ -119,15 +110,16 @@ function draw() {
     pts = pts.map((pt, i) => {
       let ptAbove =  yc > 0 ? lines[yc-1][i] : pt;
       let turnOff = ptAbove.y - pt.y > gui.ySensitivity;
-      if (turnOff && off) {
+      if (gui.stopPass == true && turnOff && off) {
         pt.off = true
       }
-      if (!turnOff && off) {
+      if (gui.stopPass == true && !turnOff && off) {
         pts[i-1].off = false
       }
       off = turnOff
 
-      pt.y = max(ptAbove.y, pt.y)
+      pt.y = gui.stopPass ? max(ptAbove.y, pt.y) : pt.y;
+
       const p = roundPt(pt, gui.roundTo)
       lines[yc].push(p)
       return p
@@ -145,6 +137,7 @@ function draw() {
   }
 
 
+  rawPts = [];
   Object.entries(colors).forEach(([cv, c]) => {
     if (svgOn) canvas.ctx.save()
 
@@ -183,12 +176,12 @@ function draw() {
         }
         if (pt.off && pts[i+1] && !pts[i+1].off) {
           off = false;
-          beginShape();
+          // beginShape();
           finalPts.push([])
         }
         if (!pt.off && off) {
           off = false
-          beginShape();
+          // beginShape();
           finalPts.push([])
         }
         if (off) return
@@ -202,9 +195,11 @@ function draw() {
       finalPts.forEach(pts => {
         if (pts.length == 0) return;
         if (pts[0].dist(pts[pts.length-1]) < gui.minLineSize) return
-        // beginShape()
-        // pts.forEach(pt => vertex(pt.x, pt.y))
-        // endShape()
+        rawPts.push(pts.map(pt => ({
+          x: (pt.x - 100) / gui.w,
+          y: (pt.y - 100) / gui.h
+        })))
+
         pc.addPath(pts);
       })
       pc.render({

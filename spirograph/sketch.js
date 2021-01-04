@@ -1,6 +1,7 @@
 /* eslint-disable no-use-before-define, class-methods-use-this, no-undef */
 let S, gui;
 let c;
+let E;
 
 let shouldSave = false;
 
@@ -24,14 +25,16 @@ function keyPressed() {
 function setup() {
   setupCanvas(SVG);
 
-  gui = new GUI();
-  gui.add('steps', 10, 0, 20000).onFinishChange(redraw);
-  gui.add('scale_x', 1, -100, 100).onFinishChange(redraw);
-  gui.add('scale_y', 1, -100, 100).onFinishChange(redraw);
+  E = new p5.Ease();
 
-  gui.add('ptsSimplify', 0, 0, 1).onFinishChange(redraw);
-  gui.add('roundTo', 0, 0, 1).onFinishChange(redraw);
-  gui.add('close', false).onFinishChange(redraw);
+  gui = new GUI();
+  gui.add('steps', 10, 0, 20000).onChange(redraw);
+  gui.add('scale_x', 1, -100, 100).onChange(redraw);
+  gui.add('scale_y', 1, -100, 100).onChange(redraw);
+
+  gui.add('ptsSimplify', 0, 0, 1).onChange(redraw);
+  gui.add('roundTo', 0, 0, 1).onChange(redraw);
+  gui.add('close', false).onChange(redraw);
 
   S = new Spirograph(
     [
@@ -133,12 +136,19 @@ class Spirograph {
     return pts;
   }
 
-  render(steps) {
-    beginShape();
-    this.getPts(steps).forEach(pt => {
-      vertex(pt.x, pt.y);
-    })
-    endShape(gui.close ? CLOSE : undefined);
+  render(n) {
+    // beginShape();
+    // this.getPts(steps).forEach(pt => {
+    //   vertex(pt.x, pt.y);
+    // })
+    // endShape(gui.close ? CLOSE : undefined);
+    const steps = this.getPts(n);
+    let last = steps[0];
+    for(let i = 1; i < steps.length; i++) {
+      const now = steps[i];
+      line(last.x, last.y, now.x, now.y)
+      last = now;
+    }
   }
 
 }
@@ -179,10 +189,10 @@ let circleCount = 0;
 function addCircle(defaultR = 0) {
   const circleId = `circle_${circleCount++}`;
   const f = gui.addFolder(circleId);
-  f.add("radius", defaultR, 0, 1000).onFinishChange(redraw)
-  f.add("speed", 1, -1000, 1000).onFinishChange(redraw)
-  f.add("radiusFn", "").onFinishChange(redraw);
-  f.add("n", 3, 1, 1000,1).onFinishChange(redraw);
+  f.add("radius", defaultR, 0, 1000).onChange(redraw)
+  f.add("speed", 1, -1000, 1000).onChange(redraw)
+  f.add("radiusFn", "").onChange(redraw);
+  f.add("n", 3, 1, 1000,1).onChange(redraw);
 
 
   return (i) => {
@@ -198,20 +208,20 @@ let translateCount = 0;
 function addTranslate(x,y) {
   const translateId = `translate_${translateCount++}`;
   const f = gui.addFolder(translateId);
-  f.add("x", `${x ? x : '0'}`).onFinishChange(redraw)
-  f.add("y", `${y ? y : '0'}`).onFinishChange(redraw)
-  f.add("x2", f.x).onFinishChange(redraw);
-  f.add("y2", f.x).onFinishChange(redraw);
-  f.add("lerp", "0").onFinishChange(redraw)
+  f.add("x", `${x ? x : '0'}`).onChange(redraw)
+  f.add("y", `${y ? y : '0'}`).onChange(redraw)
 
 
   return (i) => {
-    const x = eval(f.x);
-    const y = eval(f.y);
-    const x2 = eval(f.x2);
-    const y2 = eval(f.y2);
-    const l = eval(f.lerp)
+    let x,y;
+    try {
+      x = eval(f.x);
+      y = eval(f.y);
+    } catch {
+      x = 0;
+      y = 0;
+    }
 
-    return createVector(x, y).add(createVector((x2-x) * l, (y2-y) * l))
+    return createVector(x, y);
   }
 }
