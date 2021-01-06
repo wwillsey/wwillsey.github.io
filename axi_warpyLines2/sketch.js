@@ -202,16 +202,16 @@ function draw() {
       finalPts.forEach(pts => {
         if (pts.length == 0) return;
         if (pts[0].dist(pts[pts.length-1]) < gui.minLineSize) return
-        rawPts.push(pts.map(pt => ({
-          x: (pt.x - centerOffset.x) / gui.width,
-          y: (pt.y - centerOffset.y) / gui.height
-        })))
 
         if (gui.oneLine) {
           allPts.push(...(forward ? pts : reverse(pts)))
         } else {
           pc.addPath(pts);
         }
+        rawPts.push(pts.map(pt => ({
+          x: (pt.x - centerOffset.x) / gui.width,
+          y: (pt.y - centerOffset.y) / gui.height
+        })))
       })
       forward = !forward;
     })
