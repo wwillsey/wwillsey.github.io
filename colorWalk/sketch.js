@@ -4,11 +4,11 @@ let backgroundImg;
 let backgroundGradient = {}
 
 const isHSB = false;
-const backgroundEnabled = true;
-const useBackgroundSourceImage = true;
+const backgroundEnabled = false;
+const useBackgroundSourceImage = false;
 const maxColorVal = isHSB ? 100 : 255;
-const backgroundSplitMean = .98;
-const backgroundSplitVariance = .05;
+const backgroundSplitMean = .9;
+const backgroundSplitVariance = .08;
 const nborWeight = .3;
 const shuffleIn = true;
 
@@ -19,13 +19,13 @@ const maxDepth = 0;
 const backgroundNegative = true;
 let wipeScreen = true;
 
-const scale = 1
+const scale = 2
 const useDisplayDimensions = false;
 const isGreyscale = false;
 
 
 let stdDevs;
-const stdDevFn = () => randomGaussian(2, 0.1)
+const stdDevFn = () => randomGaussian(0, 9)
 let data;
 
 
@@ -124,7 +124,7 @@ function draw() {
 function getRandomPixelIndex(frontier) {
   // const index = 0;
 
-  let index = random(frontier.length * .9975, frontier.length * .99995)
+  let index = random(frontier.length * .9985, frontier.length * .99995)
 
   // const index = random(0, frontier.length - 1);
   // const index = randomGaussian(frontier.length * .95, frontier.length * .1)
@@ -320,12 +320,12 @@ function createColorWalk(img, frontier, hard = false) {
     image(img, 0, 0)
   }
   setInterval(() => {
-    for (let i = 0; i < 2000; i ++) {
+    for (let i = 0; i < 25000; i ++) {
       if(frontier.length) {
         processNextPixel(frontier, img)
     }
   }
-  }, 10);
+  }, 100);
 }
 
 

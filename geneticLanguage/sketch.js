@@ -14,8 +14,8 @@ let yResolution;
 const programLength = 70;
 const mutateBy = 15;
 
-const useMusic = false;
-const useMic = false;
+const useMusic = true;
+const useMic = true;
 const useBackgroundImage = false;
 const useBackgroundVideo = false;
 const useCamera = false;
@@ -157,8 +157,31 @@ function selectAtMouse() {
 
 function mousePressed() {
   selectAtMouse().toggleSelection();
+  setupMusic();
 }
 
+function setupMusic() {
+  print('press')
+  if (useMusic) {
+    if (audioSetup) return;
+    print("setting up music")
+    getAudioContext().resume()
+    audioSetup = true;
+    music = new p5.AudioIn();
+    music.getSources()
+      .then(sources => {
+        print(sources)
+        music.start();
+
+        fft = new p5.FFT();
+        fft.setInput(sources[0])
+        fft.smooth();
+        // amplitude.setInput(sources[0])
+      })
+
+  }
+
+}
 
 function setup() {
   // shaders require WEBGL mode to work
@@ -198,19 +221,6 @@ function setup() {
     music.start();
   }
 
-  c.mousePressed(() => {
-    if (useMusic) {
-      if (audioSetup) return;
-      getAudioContext().resume()
-      audioSetup = true;
-      music = new p5.AudioIn();
-      music.start();
-      fft = new p5.FFT();
-      fft.setInput(music)
-      fft.smooth();
-    }
-
-  });
 
   if(!(useBackgroundImage || useBackgroundVideo || useCamera)) {
     symbols = symbols.filter(k => !k.includes("Image"));
@@ -321,6 +331,7 @@ function updateShaderLayer(zoomScale) {
   geneticShader.setUniform('animationPosY', animationPos.y)
   geneticShader.setUniform('scalePos', [zoomScale.pos.x, zoomScale.pos.y]);
   geneticShader.setUniform("scale", zoomScale.scale)
+  if (frameCount % 100 == 0) print("music", amp)
 
   if (backgroundVideo && backgroundVideo.isReady)
     geneticShader.setUniform('backgroundImage', backgroundVideo);
@@ -331,7 +342,7 @@ function updateShaderLayer(zoomScale) {
 
 
   if (useMusic || useMic) {
-    geneticShader.setUniform('energies', musicLevelList.map(s =>   gui[s]) ? fft.getEnergy(s) : 0);
+    geneticShader.setUniform('energies', musicLevelList.map(s =>  gui[s] ? fft.getEnergy(s) : 0));
   }
   geneticShader.setUniform('stepSize', [1.0/width, 1.0/height]);
 
@@ -339,11 +350,11 @@ function updateShaderLayer(zoomScale) {
   return shaderLayer;
 }
 
-function gotSources(deviceList) {
+function getSources(deviceList) {
   if (deviceList.length > 0) {
     //set the source to the first item in the deviceList array
     audioIn.setSource(0);
-
+    print("sources", deviceList)
     let currentSource = deviceList[audioIn.currentSource];
     print(deviceList)
     print('set source to: ' + currentSource.deviceId, 5, 20, width);
@@ -594,6 +605,8 @@ function cull() {
 
   toKill.forEach(container => {
     const survivor = random(survivors);
+    // container.seed = random(Date.now());
+    // randomSeed(container.seed)
     container.exp = random() < gui.mutateChance ?
       mutateExp(survivor.exp) :
       mergeExps(random(survivors).exp, survivor.exp);
@@ -618,7 +631,8 @@ class Container {
   toggleSelection() {
     this.selected = !this.selected;
     if(this.selected) {
-      print(this.exp)
+      // print(this.exp)
+      print(this.seed)
     }
   }
 
@@ -703,10 +717,10 @@ class geneticGUI {
     const operatorFolder = this.gui.addFolder('Operators');
     const symbolFolder = this.gui.addFolder('Symbols');
 
-    const addRadio = (op, folder, init = true) => {
+    const addRadio = (op, folder, init = true, fn = updateContainerExps) => {
       this[op] = init;
       const controller = folder.add(this, op);
-      controller.onFinishChange(updateContainerExps);
+      controller.onFinishChange(fn);
       controller.domElement.parentNode.children[0].setAttribute("style", "float:left; width:90%")
       controller.domElement.setAttribute("style", "float:right; width:10%")
     }
@@ -742,7 +756,8 @@ class geneticGUI {
     musicLevelList.forEach(l => addRadio(l, musicFolder))
 
     let colorFolder = this.gui.addFolder("colors");
-    addRadio("hsv", colorFolder, false)
+    addRadio("hsv", colorFolder, false, updateShader)
+    addRadio("black & white", colorFolder, false, updateShader)
   }
 
   addValue(name, defaultVal, start, end, incr) {

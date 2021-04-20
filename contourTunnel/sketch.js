@@ -69,7 +69,7 @@ function makeShadowColor(col) {
 
 
 function getHoleWidth(ang) {
-  const scale = .4;
+  const scale = .2;
   const v = createVector(scale,0).rotate(ang).add(10,10);
 
   const t = frameCount * .005;

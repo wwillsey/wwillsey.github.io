@@ -112,11 +112,13 @@ function CreateSobelKernel(n) {
   };
 }
 
-function lerpColors(colors, v) {
+function lerpColors(colors, v, wrap = false) {
   v = constrain(v, 0, .99999999);
-  const indx = v * (colors.length - 1);
+
+  const indx = wrap ? v * colors.length : v * (colors.length - 1);
+
   const col1 = colors[floor(indx)];
-  const col2 = colors[floor(indx) + 1];
+  const col2 = colors[(floor(indx) + 1) % colors.length];
   return lerpColor(col1, col2, indx - floor(indx));
 }
 

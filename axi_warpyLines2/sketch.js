@@ -51,8 +51,6 @@ function setup() {
 
   const colorEaseFn = gui.addFolder("colorEaseFn")
   E.listAlgos().forEach(a => colorEaseFn.add(a, a == 'linear').onFinishChange(redraw))
-
-  frameRate(10)
 }
 
 function keyPressed() {
